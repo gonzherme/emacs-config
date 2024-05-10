@@ -4,14 +4,29 @@
 - It is setup to install and load all required packages and dependencies on startup.
 
 * Features
+- Elpaca package manager
+- Auctex
+- Text completion (company)
+- Dashboard
+- Flycheck
+- Frontend completion (ivy, counsel)
+- Org
+  - Elegant look
+  - Org agenda
+  - Org Roam
 
+- Code block folding (outshine)
+- Treemacs
 
-* Prerequisite
+* Prerequisites
 ** OS
 - macOS
 - GNU Linux
 - Windows (Cygwin/MSYS)
-
+  
+** Emacs
+- Emacs 28.1 or above required
+  
 * Installation
 #+begin_src
   cd
@@ -19,15 +34,15 @@
   mv emacs-config .emacs.d
 #+end_src
 
-* Usage
-#+begin_src
-  cd
-  git clone https://github.com/gonzoherme/emacs-config.git
-  mv emacs-config .emacs.d
-#+end_src
-
-
 * Screenshots
+[[./images/dashboard.png]]
+
+[[./images/treemacs.png]]
+
+[[./images/dark-treemacs.png]]
+
+[[./images/benchmark]]
+
 
 * Additional Resources
 - [[https://github.com/caisah/emacs.dz][emacs.dz]]: a great resource to check out other creative emacs configurations from [[https://melpa.org/#/][MELPA]] contributors
