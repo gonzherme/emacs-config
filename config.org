@@ -5,7 +5,6 @@
 
 * Config Overview
 - early-init.el: a file that gets loaded before this one
-- Elpaca is the package manager I'm using
 - Largely based on [[https://gitlab.com/dwt1/configuring-emacs/-/tree/main/07-the-final-touches?ref_type=heads][Derek Taylor's configuration]]
 
 * Cheat Sheet
@@ -23,8 +22,7 @@ For example, org-mode-hook can contain a list of functions to be called after or
 - [[#package-management-system][Package Management System]]
   - [[#setup][Setup]]
   - [[#automatic-package-updates][Automatic Package Updates]]
-  - [[#adding-the-scripts-directory-to-path][Adding the scripts directory to path]]
-  - [[#sourcing-the-scripts][Sourcing the scripts]]
+  - [[#adding-custom-scripts-directory-to-path][Adding custom scripts directory to path]]
 - [[#auctex][AUCTEX]]
 - [[#backup-files][BACKUP FILES]]
 - [[#company][COMPANY]]
@@ -114,15 +112,11 @@ For example, org-mode-hook can contain a list of functions to be called after or
   (auto-package-update-at-time "09:00"))
 #+end_src
 
-** Adding the scripts directory to path
+** Adding custom scripts directory to path
 #+begin_src emacs-lisp
 (add-to-list 'load-path "~/.emacs.d/scripts/")
 #+end_src
 
-** Sourcing the scripts
-#+begin_src emacs-lisp
-;; (require 'elpaca-setup)  ;; The Elpaca Package Manager
-#+end_src
 
 
 * AUCTEX
@@ -704,8 +698,6 @@ serpent-mode.el has been loaded when starting emacs, when loading the scripts fo
 
 ** Load theme
 #+begin_src emacs-lisp
-;; (load-theme 'material-light t)
-;; (load-theme 'material t)
 #+end_src
 
 * TREEMACS

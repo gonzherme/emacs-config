@@ -5,7 +5,6 @@
 - Uses org-babel to expand from the config in an org file to an elisp file
 
 ** Features
-- Elpaca package manager
 - Auctex
 - Text completion (company)
 - Dashboard
