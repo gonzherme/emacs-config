@@ -46,4 +46,4 @@
 
 
 ** Additional Resources
-- [[https://github.com/caisah/emacs.dz][emacs.dz]]: a great resource to check out other creative emacs configurations from [[https://melpa.org/#/][MELPA]] contributors
+- [[https://github.com/caisah/emacs.dz][emacs.dz]] check out other creative emacs configurations from [[https://melpa.org/#/][MELPA]] contributors
