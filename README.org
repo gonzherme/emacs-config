@@ -1,9 +1,10 @@
 * Emacs Config
 
-- This is my emacs configuration.
-- It is setup to install and load all required packages and dependencies on startup.
+- This is my emacs configuration
+- It is setup to install and load all required packages and dependencies on startup
+- Uses org-babel to expand from the config in an org file to an elisp file
 
-* Features
+** Features
 - Elpaca package manager
 - Auctex
 - Text completion (company)
@@ -18,31 +19,31 @@
 - Code block folding (outshine)
 - Treemacs
 
-* Prerequisites
-** OS
+** Prerequisites
+*** OS
 - macOS
 - GNU Linux
 - Windows (Cygwin/MSYS)
   
-** Emacs
+*** Emacs
 - Emacs 28.1 or above required
   
-* Installation
+** Installation
 #+begin_src
   cd
   git clone https://github.com/gonzoherme/emacs-config.git
   mv emacs-config .emacs.d
 #+end_src
 
-* Screenshots
+** Screenshots
 [[./images/dashboard.png]]
 
 [[./images/treemacs.png]]
 
 [[./images/dark-treemacs.png]]
 
-[[./images/benchmark]]
+[[./images/benchmark.png]]
 
 
-* Additional Resources
+** Additional Resources
 - [[https://github.com/caisah/emacs.dz][emacs.dz]]: a great resource to check out other creative emacs configurations from [[https://melpa.org/#/][MELPA]] contributors
