@@ -5,15 +5,20 @@
 
 * Config Overview
 - early-init.el: a file that gets loaded before this one
-- 'use-package' only loads packages from ELPA that have already been installed
-  ':ensure t' inside use-package: checks if the package is installed, and if it isn't, it installs it
 - Elpaca is the package manager I'm using
+- Largely based on [[https://gitlab.com/dwt1/configuring-emacs/-/tree/main/07-the-final-touches?ref_type=heads][Derek Taylor's configuration]]
 
-- STARTUP showeverything: open all org tabs when opening file
-- OPTIONS toc:2 depth of the table of contents is 2
+* Cheat Sheet
+- *Hooks*: options containing functions to be run before or after a function.
+For example, org-mode-hook can contain a list of functions to be called after org-mode is turned on.
+- =use-package= only loads packages from ELPA that have already been installed
+  =:ensure t= inside =use-package=: checks if the package is installed, and if it isn't, it installs it
+- =STARTUP showeverything= open all org tabs when opening file
+- =OPTIONS toc:2= depth of the table of contents is 2
 
 * TABLE OF CONTENTS                                                     :toc:
 - [[#config-overview][Config Overview]]
+- [[#cheat-sheet][Cheat Sheet]]
 - [[#important-programs-to-load-first][IMPORTANT PROGRAMS TO LOAD FIRST]]
   - [[#adding-the-scripts-directory-to-path][Adding the scripts directory to path]]
   - [[#sourcing-the-scripts][Sourcing the scripts]]
@@ -62,13 +67,14 @@
   - [[#doom-themes][Doom Themes]]
   - [[#theme-changer-disactivated][Theme Changer (disactivated)]]
   - [[#load-theme][Load theme]]
+- [[#treemacs][TREEMACS]]
 - [[#which-key][WHICH-KEY]]
-- [[#miscellaneous-one-liners][MISCELLANEOUS ONE-LINERS]]
+- [[#miscellaneous][MISCELLANEOUS]]
 
 * IMPORTANT PROGRAMS TO LOAD FIRST
-+ To keep this config.org a reasonable length, I have moved a lot of code to individual scripts that will be sourced by this config.  These scripts are found in “~/.emacs.d/scripts” and do not contain any code that most people are likely to need to edit.
+- To keep this config.org a reasonable length, I have moved a lot of code to individual scripts that will be sourced by this config.  These scripts are found in “~/.emacs.d/scripts” and do not contain any code that most people are likely to need to edit.
 
-+ Note that to use scripts, at the end of each script file, you have to write: (provide 'file_name_without_.el)
+- Note that to use scripts, at the end of each script file, you have to write: (provide 'file_name_without_.el)
 
 
 ** Adding the scripts directory to path
@@ -83,7 +89,7 @@
 
 
 * AUCTEX
-Standard Emacs Latex package
+=auctex= is the standard Emacs Latex package
 
 #+begin_src emacs-lisp
 (use-package auctex
@@ -103,7 +109,7 @@ By default, Emacs creates automatic backups of files in their original directori
 
 
 * COMPANY
-Company is a text completion framework for Emacs. The name stands for “complete anything”.  Completion will start automatically after you type a few letters. Use M-n and M-p to select, <return> to complete or <tab> to complete the common part.
+=company= is a text completion framework for Emacs. The name stands for “complete anything”. Completion will start automatically after you type a few letters. Use =M-n= and =M-p= to select, =<return>= to complete or =<tab>= to complete the common part.
 
 #+begin_src emacs-lisp
 (use-package company
@@ -130,7 +136,7 @@ Company is a text completion framework for Emacs. The name stands for “complet
 
 
 * DASHBOARD
-Emacs Dashboard is an extensible startup screen showing you recent files, bookmarks, agenda items and an Emacs banner.
+=dashboard= is an extensible startup screen showing you recent files, bookmarks, agenda items and an Emacs banner.
 #+begin_src emacs-lisp
 (use-package dashboard
   :ensure t 
@@ -206,7 +212,7 @@ This is an icon set that can be used with dashbaord, dired, ibuffer, and other E
 
 
 * DIMINISH
-This package implements hiding or abbreviation of the modeline displays (lighters) of minor-modes.  With this package installed, you can add ‘:diminish’ to any use-package block to hide that particular mode in the modeline.
+=diminish= implements hiding or abbreviation of the modeline displays (lighters) of minor-modes.  With this package installed, you can add =:diminish= to any use-package block to hide that particular mode in the modeline.
 
 #+begin_src emacs-lisp
 (use-package diminish
@@ -253,9 +259,9 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
 
 
 * IVY (COUNSEL)
-+ Ivy, a generic completion mechanism for Emacs
-+ Counsel, a collection of Ivy-enhanced versions of common Emacs commands
-+ Ivy-rich allows us to add descriptions alongside the commands in M-x
+- =ivy= a generic completion mechanism for Emacs
+- =counsel= a collection of Ivy-enhanced versions of common Emacs commands
+- =ivy-rich= allows us to add descriptions alongside the commands in =M-x=
 
 #+begin_src emacs-lisp
 (use-package ivy
@@ -290,8 +296,6 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
 
 
 * ORG MODE
-*What are Hooks*: options containing functions to be run before or after a function.
-For example, org-mode-hook can contain a list of functions to be called after org-mode is turned on.
 
 ** Ensuring emacs fully loads org
 #+begin_src emacs-lisp
@@ -323,7 +327,7 @@ For example, org-mode-hook can contain a list of functions to be called after or
 #+end_src
 
 ** Enabling Org Bullets
-Org-bullets gives aesthetic bullets rather than asterisks.
+=org-bullets= gives aesthetic bullets rather than asterisks.
 
 #+begin_src emacs-lisp
 (add-hook 'org-mode-hook 'org-indent-mode)
@@ -361,7 +365,7 @@ Org mode source blocks have some really weird and annoying default indentation b
 
 
 ** Load languages to execute on org
-Can execute code blocks using C-c C-c
+Can execute code blocks using =C-c C-c=
 #+begin_src emacs-lisp
 (org-babel-do-load-languages
  'org-babel-load-languages
@@ -386,8 +390,8 @@ Can execute code blocks using C-c C-c
 #+end_src
 
 ** Custom Keywords
-+ The (t) and (n) are keys to press to set these states
-+ The "|" separates active and unactive states
+- The (t) and (n) are keys to press to set these states
+- The "|" separates active and unactive states
 #+begin_src emacs-lisp
 (setq org-todo-keywords
       '(
@@ -518,7 +522,7 @@ Can execute code blocks using C-c C-c
 
 
 * Outshine
-Adds an org-mode functionality to any non-org mode you'd like. ([[https://github.com/alphapapa/outshine][Source]])
+=outshine= adds an org-mode functionality to any non-org mode you'd like. ([[https://github.com/alphapapa/outshine][Source]])
 
 #+begin_src emacs-lisp
 (use-package outshine
@@ -532,7 +536,7 @@ Adds an org-mode functionality to any non-org mode you'd like. ([[https://github
 
 
 * PDF TOOLS
-PDF tools is the package I'll be using to view PDFs, rather than using Skim or Preview.
+PDF tools is the package used for viewing PDFs (an alternative to Skim, Preview)
 
 #+begin_src emacs-lisp
 ;; Helps avois blurry PDFs on Mac retina display
@@ -606,13 +610,12 @@ serpent-mode.el has been loaded when starting emacs, when loading the scripts fo
 
 
 * THEMES
-+ The first line designates the directory where all the themes are stored. (a theme can be written as a block of elisp code).
+- The first line designates the directory where all the themes are stored. (a theme can be written as a block of elisp code).
 
-+ These blocks of code can be automatically generated using the [[https://emacsfodder.github.io/emacs-theme-editor/][Emacs Theme Editor]]
+- These blocks of code can be automatically generated using the [[https://emacsfodder.github.io/emacs-theme-editor/][Emacs Theme Editor]]
 
-+ Important: when writing (load-theme 'name t)
--> The name ('name') is specified in the theme elisp file itself, with the command: (provide-theme 'dracula)
-In that case, it's saying that the name of the theme is 'dracula
+- When writing =(load-theme 'name t)=, the =name= is specified in the theme's elisp file with the command =(provide-theme 'name)=
+
 ** Custom themes
 #+begin_src emacs-lisp
 ;; The following adds all our own-made themes in the themes folder to Emacs' custom themes list
@@ -640,8 +643,7 @@ In that case, it's saying that the name of the theme is 'dracula
 
 
 ** Theme Changer (disactivated)
-A package that changes your theme depending on your location's sunrise and sunset time
-
+- =theme-changer= changes your theme depending on your location's sunrise and sunset time
 - Emacs source: https://www.gnu.org/software/emacs/manual/html_node/emacs/Sunrise_002fSunset.html
 - Package: https://github.com/hadronzoo/theme-changer
 
@@ -671,6 +673,125 @@ A package that changes your theme depending on your location's sunrise and sunse
 ;; (load-theme 'material t)
 #+end_src
 
+* TREEMACS
+- =treemacs= is a tree layout file explorer for Emacs ([[https://github.com/Alexander-Miller/treemacs][source]])
+- The following code contains treemacs' with all of its options and configurations in their default setting:
+  #+begin_src emacs-lisp
+  (use-package treemacs
+  :ensure t
+  :defer t
+  :init
+  (with-eval-after-load 'winum
+    (define-key winum-keymap (kbd "M-0") #'treemacs-select-window))
+  :config
+  (progn
+    (setq treemacs-collapse-dirs                   (if treemacs-python-executable 3 0)
+          treemacs-deferred-git-apply-delay        0.5
+          treemacs-directory-name-transformer      #'identity
+          treemacs-display-in-side-window          t
+          treemacs-eldoc-display                   'simple
+          treemacs-file-event-delay                2000
+          treemacs-file-extension-regex            treemacs-last-period-regex-value
+          treemacs-file-follow-delay               0.2
+          treemacs-file-name-transformer           #'identity
+          treemacs-follow-after-init               t
+          treemacs-expand-after-init               t
+          treemacs-find-workspace-method           'find-for-file-or-pick-first
+          treemacs-git-command-pipe                ""
+          treemacs-goto-tag-strategy               'refetch-index
+          treemacs-header-scroll-indicators        '(nil . "^^^^^^")
+          treemacs-hide-dot-git-directory          t
+          treemacs-indentation                     2
+          treemacs-indentation-string              " "
+          treemacs-is-never-other-window           nil
+          treemacs-max-git-entries                 5000
+          treemacs-missing-project-action          'ask
+          treemacs-move-forward-on-expand          nil
+          treemacs-no-png-images                   nil
+          treemacs-no-delete-other-windows         t
+          treemacs-project-follow-cleanup          nil
+          treemacs-persist-file                    (expand-file-name ".cache/treemacs-persist" user-emacs-directory)
+          treemacs-position                        'left
+          treemacs-read-string-input               'from-child-frame
+          treemacs-recenter-distance               0.1
+          treemacs-recenter-after-file-follow      nil
+          treemacs-recenter-after-tag-follow       nil
+          treemacs-recenter-after-project-jump     'always
+          treemacs-recenter-after-project-expand   'on-distance
+          treemacs-litter-directories              '("/node_modules" "/.venv" "/.cask")
+          treemacs-project-follow-into-home        nil
+          treemacs-show-cursor                     nil
+          treemacs-show-hidden-files               t
+          treemacs-silent-filewatch                nil
+          treemacs-silent-refresh                  nil
+          treemacs-sorting                         'alphabetic-asc
+          treemacs-select-when-already-in-treemacs 'move-back
+          treemacs-space-between-root-nodes        t
+          treemacs-tag-follow-cleanup              t
+          treemacs-tag-follow-delay                1.5
+          treemacs-text-scale                      nil
+          treemacs-user-mode-line-format           nil
+          treemacs-user-header-line-format         nil
+          treemacs-wide-toggle-width               70
+          treemacs-width                           35
+          treemacs-width-increment                 1
+          treemacs-width-is-initially-locked       t
+          treemacs-workspace-switch-cleanup        nil)
+
+    ;; The default width and height of the icons is 22 pixels. If you are
+    ;; using a Hi-DPI display, uncomment this to double the icon size.
+    ;;(treemacs-resize-icons 44)
+
+    (treemacs-follow-mode t)
+    (treemacs-filewatch-mode t)
+    (treemacs-fringe-indicator-mode 'always)
+    (when treemacs-python-executable
+      (treemacs-git-commit-diff-mode t))
+
+    (pcase (cons (not (null (executable-find "git")))
+                 (not (null treemacs-python-executable)))
+      (`(t . t)
+       (treemacs-git-mode 'deferred))
+      (`(t . _)
+       (treemacs-git-mode 'simple)))
+
+    (treemacs-hide-gitignored-files-mode nil))
+  :bind
+  (:map global-map
+        ("M-0"       . treemacs-select-window)
+        ("C-x t 1"   . treemacs-delete-other-windows)
+        ("C-x t t"   . treemacs)
+        ("C-x t d"   . treemacs-select-directory)
+        ("C-x t B"   . treemacs-bookmark)
+        ("C-x t C-t" . treemacs-find-file)
+        ("C-x t M-t" . treemacs-find-tag)))
+
+(use-package treemacs-evil
+  :after (treemacs evil)
+  :ensure t)
+
+(use-package treemacs-projectile
+  :after (treemacs projectile)
+  :ensure t)
+
+(use-package treemacs-icons-dired
+  :hook (dired-mode . treemacs-icons-dired-enable-once)
+  :ensure t)
+
+(use-package treemacs-magit
+  :after (treemacs magit)
+  :ensure t)
+
+(use-package treemacs-persp ;;treemacs-perspective if you use perspective.el vs. persp-mode
+  :after (treemacs persp-mode) ;;or perspective vs. persp-mode
+  :ensure t
+  :config (treemacs-set-scope-type 'Perspectives))
+
+(use-package treemacs-tab-bar ;;treemacs-tab-bar if you use tab-bar-mode
+  :after (treemacs)
+  :ensure t
+  :config (treemacs-set-scope-type 'Tabs))
+  #+end_src
 
 * WHICH-KEY
 Provides suggested Emacs commands when having typed an incomplete command
@@ -697,7 +818,7 @@ Provides suggested Emacs commands when having typed an incomplete command
 #+end_src
 
 
-* MISCELLANEOUS ONE-LINERS
+* MISCELLANEOUS
 #+begin_src emacs-lisp
 (delete-selection-mode 1)    ;; You can select text and delete it by typing.
 (save-place-mode 1)          ;; Remember and restore the last cursor location of opened files
