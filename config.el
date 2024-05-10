@@ -1,88 +1,3 @@
-#+TITLE: Gonz's GNU Emacs Config
-#+AUTHOR: Gonzalo de Hermenegildo
-#+STARTUP: showeverything
-#+OPTIONS: toc:2
-
-* Config Overview
-- early-init.el: a file that gets loaded before this one
-- Elpaca is the package manager I'm using
-- Largely based on [[https://gitlab.com/dwt1/configuring-emacs/-/tree/main/07-the-final-touches?ref_type=heads][Derek Taylor's configuration]]
-
-* Cheat Sheet
-- *Hooks*: options containing functions to be run before or after a function.
-For example, org-mode-hook can contain a list of functions to be called after org-mode is turned on.
-- =use-package= only loads packages from ELPA that have already been installed
-  =:ensure t= inside =use-package=: checks if the package is installed, and if it isn't, it installs it
-- =STARTUP showeverything= open all org tabs when opening file
-- =OPTIONS toc:2= depth of the table of contents is 2
-
-* TABLE OF CONTENTS                                                     :toc:
-- [[#config-overview][Config Overview]]
-- [[#cheat-sheet][Cheat Sheet]]
-- [[#important-programs-to-load-first][IMPORTANT PROGRAMS TO LOAD FIRST]]
-- [[#package-management-system][Package Management System]]
-  - [[#setup][Setup]]
-  - [[#automatic-package-updates][Automatic Package Updates]]
-  - [[#adding-the-scripts-directory-to-path][Adding the scripts directory to path]]
-  - [[#sourcing-the-scripts][Sourcing the scripts]]
-- [[#auctex][AUCTEX]]
-- [[#backup-files][BACKUP FILES]]
-- [[#company][COMPANY]]
-- [[#dashboard][DASHBOARD]]
-- [[#graphical-user-interface-tweaks][GRAPHICAL USER INTERFACE TWEAKS]]
-  - [[#disable-menubar-toolbars-and-scrollbars][Disable Menubar, Toolbars, and Scrollbars]]
-  - [[#display-line-numbers-and-truncated-lines][Display Line Numbers and Truncated Lines]]
-  - [[#window-size-on-startup][Window size on startup]]
-  - [[#fonts-type-size][Fonts: type, size]]
-- [[#all-the-icons][ALL THE ICONS]]
-- [[#diminish][DIMINISH]]
-- [[#flycheck][FLYCHECK]]
-- [[#git-programs][GIT PROGRAMS]]
-  - [[#git-time-machine][Git Time Machine]]
-  - [[#magit][MAGIT]]
-- [[#ivy-counsel][IVY (COUNSEL)]]
-- [[#org-mode][ORG MODE]]
-  - [[#ensuring-emacs-fully-loads-org][Ensuring emacs fully loads org]]
-  - [[#enabling-table-of-contents][Enabling Table of Contents]]
-  - [[#making-org-look-modern][Making org look modern]]
-  - [[#enabling-org-bullets][Enabling Org Bullets]]
-  - [[#disable-indent][Disable Indent]]
-  - [[#org-level-header-sizes][Org level header sizes]]
-  - [[#replace-list-hyphen-with-dot][Replace list hyphen with dot]]
-  - [[#load-languages-to-execute-on-org][Load languages to execute on org]]
-- [[#org-agenda][Org agenda]]
-  - [[#the-files-agenda-tracks][The files agenda tracks:]]
-  - [[#visual-tweaks][Visual tweaks]]
-  - [[#custom-keywords][Custom Keywords]]
-  - [[#agenda-view-shortcuts][Agenda View Shortcuts]]
-  - [[#habit-tracking][Habit tracking]]
-- [[#org-roam][Org Roam]]
-  - [[#roam-setup][Roam setup]]
-  - [[#org-roam-interactive-ui][Org Roam Interactive UI]]
-- [[#outshine][Outshine]]
-- [[#pdf-tools][PDF TOOLS]]
-- [[#programming][PROGRAMMING]]
-  - [[#automation][Automation]]
-  - [[#language-support][Language Support]]
-  - [[#python-support][Python support]]
-- [[#themes][THEMES]]
-  - [[#custom-themes][Custom themes]]
-  - [[#doom-themes][Doom Themes]]
-  - [[#theme-changer-disactivated][Theme Changer (disactivated)]]
-  - [[#load-theme][Load theme]]
-- [[#treemacs][TREEMACS]]
-- [[#which-key][WHICH-KEY]]
-- [[#miscellaneous][MISCELLANEOUS]]
-
-* IMPORTANT PROGRAMS TO LOAD FIRST
-- To keep this config.org a reasonable length, I have moved a lot of code to individual scripts that will be sourced by this config.  These scripts are found in “~/.emacs.d/scripts” and do not contain any code that most people are likely to need to edit.
-
-- Note that to use scripts, at the end of each script file, you have to write: (provide 'file_name_without_.el)
-
-
-* Package Management System
-** Setup
-#+begin_src emacs-lisp
 ;; Initialize package sources
 (require 'package)
 
@@ -100,10 +15,7 @@ For example, org-mode-hook can contain a list of functions to be called after or
 
 (require 'use-package)
 (setq use-package-always-ensure t)
-#+end_src
 
-** Automatic Package Updates
-#+begin_src emacs-lisp
 (use-package auto-package-update
   :custom
   (auto-package-update-interval 7)
@@ -112,43 +24,17 @@ For example, org-mode-hook can contain a list of functions to be called after or
   :config
   (auto-package-update-maybe)
   (auto-package-update-at-time "09:00"))
-#+end_src
 
-** Adding the scripts directory to path
-#+begin_src emacs-lisp
 (add-to-list 'load-path "~/.emacs.d/scripts/")
-#+end_src
 
-** Sourcing the scripts
-#+begin_src emacs-lisp
 ;; (require 'elpaca-setup)  ;; The Elpaca Package Manager
-#+end_src
 
-
-* AUCTEX
-=auctex= is the standard Emacs Latex package
-
-#+begin_src emacs-lisp
 (use-package auctex
   :ensure t
 )
-#+end_src
 
-
-
-* BACKUP FILES
-By default, Emacs creates automatic backups of files in their original directories, such “file.el” and the backup “file.el~”.  This leads to a lot of clutter, so let’s tell Emacs to put all backups that it creates in the TRASH directory.
-
-#+begin_src emacs-lisp
 (setq backup-directory-alist '((".*" . "~/.local/share/Trash/files")))
-#+end_src
 
-
-
-* COMPANY
-=company= is a text completion framework for Emacs. The name stands for “complete anything”. Completion will start automatically after you type a few letters. Use =M-n= and =M-p= to select, =<return>= to complete or =<tab>= to complete the common part.
-
-#+begin_src emacs-lisp
 (use-package company
   :ensure t
   :defer 2
@@ -169,12 +55,7 @@ By default, Emacs creates automatic backups of files in their original directori
 ;;   :diminish
 ;;   :hook (company-mode . company-box-mode)
 ;; )
-#+end_src
 
-
-* DASHBOARD
-=dashboard= is an extensible startup screen showing you recent files, bookmarks, agenda items and an Emacs banner.
-#+begin_src emacs-lisp
 (use-package dashboard
   :ensure t 
   :init
@@ -193,37 +74,21 @@ By default, Emacs creates automatic backups of files in their original directori
                                     (bookmarks . "book")))
   :config
   (dashboard-setup-startup-hook))
-#+end_src
 
-* GRAPHICAL USER INTERFACE TWEAKS
-More minimal user interface
+(menu-bar-mode -1)
+(tool-bar-mode -1)
+(scroll-bar-mode -1)
 
-** Disable Menubar, Toolbars, and Scrollbars
-#+begin_src emacs-lisp
-  (menu-bar-mode -1)
-  (tool-bar-mode -1)
-  (scroll-bar-mode -1)
-#+end_src
+(global-display-line-numbers-mode 1)
+(global-visual-line-mode t)
 
-** Display Line Numbers and Truncated Lines
-#+begin_src emacs-lisp
-  (global-display-line-numbers-mode 1)
-  (global-visual-line-mode t)
-#+end_src
-
-** Window size on startup
-#+begin_src emacs-lisp
 ;; full screen
 (add-to-list 'default-frame-alist '(fullscreen . maximized))
 
 ;; specific height and width
 ;;(add-to-list 'default-frame-alist '(height . 50))
 ;;(add-to-list 'default-frame-alist '(width . 100))
-#+end_src
 
-
-** Fonts: type, size
-#+begin_src emacs-lisp
 (set-face-attribute 'default nil
 	:height 150
 	:weight 'medium)
@@ -231,12 +96,7 @@ More minimal user interface
 ;; Sets commented regions to itallic
 (set-face-attribute 'font-lock-comment-face nil
    :slant 'italic)
-#+end_src
 
-* ALL THE ICONS
-This is an icon set that can be used with dashbaord, dired, ibuffer, and other Emacs programs.
-
-#+begin_src emacs-lisp
 (use-package all-the-icons
   :ensure t
   :if (display-graphic-p))
@@ -244,35 +104,16 @@ This is an icon set that can be used with dashbaord, dired, ibuffer, and other E
 (use-package all-the-icons-dired
   :ensure t
   :hook (dired-mode . (lambda () (all-the-icons-dired-mode t))))
-#+end_src
 
-
-* DIMINISH
-=diminish= implements hiding or abbreviation of the modeline displays (lighters) of minor-modes.  With this package installed, you can add =:diminish= to any use-package block to hide that particular mode in the modeline.
-
-#+begin_src emacs-lisp
 (use-package diminish
   :ensure t)
-#+end_src
 
-* FLYCHECK
-For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.html][here]].
-
-#+begin_src emacs-lisp
 (use-package flycheck
   :ensure t
   :defer t
   :diminish ;;explanation of what diminish does, search for "DIMINISH"
   :init (global-flycheck-mode))
-#+end_src
 
-
-
-* GIT PROGRAMS
-** Git Time Machine
-[[https://github.com/emacsmirror/git-timemachine][Git Time Machine]] is a program that allows you to move backwards and forwards through a file’s commits.  ‘SPC g t’ will open the time machine on a file if it is in a git repo.  Then, while in normal mode, you can use ‘CTRL-j’ and ‘CTRL-k’ to move backwards and forwards through the commits.
-
-#+begin_src emacs-lisp
 (use-package git-timemachine
   :ensure t
   :after git-timemachine
@@ -281,25 +122,11 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
     (evil-define-key 'normal git-timemachine-mode-map (kbd "C-j") 'git-timemachine-show-previous-revision)
     (evil-define-key 'normal git-timemachine-mode-map (kbd "C-k") 'git-timemachine-show-next-revision)
 )
-#+end_src
 
-
-
-** MAGIT
-[[https://magit.vc/manual/][Magit]] is the full-featured git client for Emacs.
-#+begin_src emacs-lisp
 (use-package magit
   :ensure t
 )
-#+end_src
 
-
-* IVY (COUNSEL)
-- =ivy= a generic completion mechanism for Emacs
-- =counsel= a collection of Ivy-enhanced versions of common Emacs commands
-- =ivy-rich= allows us to add descriptions alongside the commands in =M-x=
-
-#+begin_src emacs-lisp
 (use-package ivy
   :ensure t
   :custom
@@ -328,27 +155,13 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
    ivy-rich-switch-buffer-align-virtual-buffer t
    ivy-rich-path-style 'abbrev))
 
-#+end_src
-
-
-* ORG MODE
-
-** Ensuring emacs fully loads org
-#+begin_src emacs-lisp
 (require 'org)
-#+end_src
 
-** Enabling Table of Contents
-#+begin_src emacs-lisp
 (use-package toc-org
   :ensure t
   :commands toc-org-enable
   :init (add-hook 'org-mode-hook 'toc-org-enable))
-#+end_src
 
-** Making org look modern
-[[https://github.com/minad/org-modern][Source]]
-#+begin_src emacs-lisp
 (setq
  ;; Edit settings
  org-auto-align-tags nil
@@ -360,27 +173,14 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
  ;; Org styling, hide markup etc.
  org-hide-emphasis-markers t;; hide markers such as ** for bold, or __ for underline
  )
-#+end_src
 
-** Enabling Org Bullets
-=org-bullets= gives aesthetic bullets rather than asterisks.
-
-#+begin_src emacs-lisp
 (add-hook 'org-mode-hook 'org-indent-mode)
 (use-package org-bullets
   :ensure t)
 (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1)))
-#+end_src
 
-** Disable Indent
-Org mode source blocks have some really weird and annoying default indentation behavior. I think this has to do with electric-indent-mode, which is turned on by default in Emacs. So this turns it off.
-
-#+begin_src emacs-lisp
 (setq org-edit-src-content-indentation 0) ;; sets org code indentation to 0 spaces by default
-#+end_src
 
-** Org level header sizes
-#+begin_src emacs-lisp
 (custom-set-faces
  '(org-level-1 ((t (:inherit outline-1 :height 1.2))))
  '(org-level-2 ((t (:inherit outline-2 :height 1.0))))
@@ -389,46 +189,24 @@ Org mode source blocks have some really weird and annoying default indentation b
  '(org-level-5 ((t (:inherit outline-3 :height 1.0))))
  '(org-level-6 ((t (:inherit outline-6 :height 1.0))))
  '(org-level-7 ((t (:inherit outline-7 :height 1.0)))))
-#+end_src
 
-** Replace list hyphen with dot
-[[https://www.howardism.org/Technical/Emacs/orgmode-wordprocessor.html][Source]]
-#+begin_src emacs-lisp
 (font-lock-add-keywords 'org-mode
                         '(("^ +\\([-*]\\) "
                            (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
-#+end_src
 
-
-** Load languages to execute on org
-Can execute code blocks using =C-c C-c=
-#+begin_src emacs-lisp
 (org-babel-do-load-languages
  'org-babel-load-languages
  '((python . t)))
-#+end_src
 
-
-* Org agenda
-** The files agenda tracks:
-#+begin_src emacs-lisp
 (setq org-agenda-files 
       '("~/gonz/OrgFiles/")
 )
-#+end_src
 
-** Visual tweaks
-#+begin_src emacs-lisp
 (setq org-ellipsis " ▾")
 (setq org-agenda-start-with-log-mode t)
 ;; (setq org-log-done 'time) ;; This is to put in agenda time when a task was marked as done
 (setq org-log-into-drawer t)
-#+end_src
 
-** Custom Keywords
-- The (t) and (n) are keys to press to set these states
-- The "|" separates active and unactive states
-#+begin_src emacs-lisp
 (setq org-todo-keywords
       '(
 	    (sequence "TODO" "|" "DONE")
@@ -447,32 +225,19 @@ Can execute code blocks using =C-c C-c=
 	          ("FUN" :foreground "medium spring green" :weight bold))
 	  )
 )
-#+end_src
 
-
-** Agenda View Shortcuts
-*** M-x tasks
-#+begin_src emacs-lisp
 (defun tasks ()
   (interactive)
   ;;(delete-other-windows)
   (find-file "~/gonz/OrgFiles/Tasks.org")
 )
-#+end_src
 
-
-*** M-x reminders
-#+begin_src emacs-lisp
 (defun reminders ()
   (interactive)
   ;;(delete-other-windows)
   (find-file "~/gonz/OrgFiles/Reminders.org")
 )
-#+end_src
 
-
-*** M-x today
-#+begin_src emacs-lisp
 (defun today ()
    (interactive)
    (delete-other-windows) 
@@ -481,10 +246,7 @@ Can execute code blocks using =C-c C-c=
 	 )   
    (delete-other-windows)  
 )
-#+end_src
 
-*** M-x week
-#+begin_src emacs-lisp
 (setq org-agenda-span 10 ;; number of days to include in week view
       org-agenda-start-on-weekday nil ;; sets week view's first day to be today
 )
@@ -497,29 +259,13 @@ Can execute code blocks using =C-c C-c=
 	 )
       (delete-other-windows)  
 )
-#+end_src
 
-*** M-x config
-#+begin_src emacs-lisp
 (defun config ()
   (interactive)
   ;; (delete-other-windows)
   (find-file "~/.emacs.d/config.org")
 )
-#+end_src
 
-
-** Habit tracking
-#+begin_src emacs_lisp
-(require 'org-habit)
-(add-to-list 'org-modules 'org-habit)
-(setq org-habit-graph-colum 80)  ;; what column in your agenda it pops up on
-#+end_src
-
-
-* Org Roam
-** Roam setup
-#+begin_src emacs-lisp
 (use-package org-roam
   :ensure t
   :init
@@ -536,10 +282,7 @@ Can execute code blocks using =C-c C-c=
   :config
   (org-roam-db-autosync-mode)
   (org-roam-setup))
-#+end_src
 
-** Org Roam Interactive UI
-#+begin_src emacs-lisp
 ;; Required dependencies for ui graph package
 (use-package websocket
   :ensure t
@@ -553,13 +296,7 @@ Can execute code blocks using =C-c C-c=
           org-roam-ui-follow t
           org-roam-ui-update-on-save t
           org-roam-ui-open-on-start t))
-#+end_src
 
-
-* Outshine
-=outshine= adds an org-mode functionality to any non-org mode you'd like. ([[https://github.com/alphapapa/outshine][Source]])
-
-#+begin_src emacs-lisp
 (use-package outshine
   :ensure t
   :config
@@ -567,13 +304,7 @@ Can execute code blocks using =C-c C-c=
   (add-hook 'c-mode-hook 'outshine-mode)
   (add-hook 'cpp-mode-hook 'outshine-mode)
 )
-#+end_src
 
-
-* PDF TOOLS
-PDF tools is the package used for viewing PDFs (an alternative to Skim, Preview)
-
-#+begin_src emacs-lisp
 ;; Helps avois blurry PDFs on Mac retina display
 (setq pdf-view-use-scaling t)
 
@@ -596,69 +327,26 @@ PDF tools is the package used for viewing PDFs (an alternative to Skim, Preview)
 ;;   (add-hook 'pdf-view-mode-hook 'auto-revert-mode)
 ;;   (add-hook 'pdf-view-mode-hook 'my-pdf-view-set-bindings))
 
-#+end_src
-
-
-
-
-* PROGRAMMING
-** Automation
-#+begin_src emacs-lisp
 (electric-pair-mode 1) ;; auto fill parentheses
-#+end_src
 
-
-** Language Support
-+ Emacs has built-in programming language modes for Lisp, Scheme, DSSSL, Ada, ASM, AWK, C, C++, Fortran, Icon, IDL (CORBA), IDLWAVE, Java, Javascript, M4, Makefiles, Metafont, Modula2, Object Pascal, Objective-C, Octave, Pascal, Perl, Pike, PostScript, Prolog, Python, Ruby, Simula, SQL, Tcl, Verilog, and VHDL.  Other languages will require you to install additional modes.
-
-+ [[https://www.gnu.org/software/emacs/manual/html_node/efaq/Associating-modes-with-files.html][How do I make Emacs use a certain major mode for certain files?]]
-
-#+begin_src emacs-lisp
 (use-package haskell-mode
   :ensure t)
 (use-package php-mode
   :ensure t)
-#+end_src
 
-*** c0
-#+begin_src emacs-lisp
 (add-to-list 'auto-mode-alist '("\\.c0\\'" . c-mode)) ;; turn on C-mode with any file ending in .c0
-#+end_src
 
-*** Serpent
-serpent-mode.el has been loaded when starting emacs, when loading the scripts folder
-
-#+begin_src emacs-lisp
 (require 'serpent-mode) ;; request to load mode as a response to the (provide 'serpent-mode) line in the serpent-mode.el file
 (add-to-list 'auto-mode-alist '("\\.srp\\'" . serpent-mode))
 
 (add-to-list 'auto-mode-alist '("\\.py\\'" . python-mode))
-#+end_src
 
-
-
-** Python support
-#+begin_src emacs-lisp
 ;; remove error message when launching python
 (setq python-shell-completion-native-enable nil)
-#+end_src
 
-
-* THEMES
-- The first line designates the directory where all the themes are stored. (a theme can be written as a block of elisp code).
-
-- These blocks of code can be automatically generated using the [[https://emacsfodder.github.io/emacs-theme-editor/][Emacs Theme Editor]]
-
-- When writing =(load-theme 'name t)=, the =name= is specified in the theme's elisp file with the command =(provide-theme 'name)=
-
-** Custom themes
-#+begin_src emacs-lisp
 ;; The following adds all our own-made themes in the themes folder to Emacs' custom themes list
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
-#+end_src
 
-** Doom Themes
-#+begin_src emacs-lisp
 ;; The following adds a bunch of doom-themes to Emacs' custom themes list, which we can load using M-x load-theme
 
 ;; Dom themes: [https://github.com/doomemacs/themes]
@@ -674,15 +362,7 @@ serpent-mode.el has been loaded when starting emacs, when loading the scripts fo
   ;; Corrects (and improves) org-mode's native fontification.
   (doom-themes-org-config)
 )
-#+end_src
 
-
-** Theme Changer (disactivated)
-- =theme-changer= changes your theme depending on your location's sunrise and sunset time
-- Emacs source: https://www.gnu.org/software/emacs/manual/html_node/emacs/Sunrise_002fSunset.html
-- Package: https://github.com/hadronzoo/theme-changer
-
-#+begin_src emacs-lisp
 ;; Set location
 ;; ;; (setq calendar-latitude 40.4)
 ;; ;; (setq calendar-longitude -79.9)
@@ -700,26 +380,14 @@ serpent-mode.el has been loaded when starting emacs, when loading the scripts fo
 ;;   ;; (change-theme 'doom-Iosvkem 'doom-Iosvkem)
   
 ;; )
-#+end_src
 
-** Load theme
-#+begin_src emacs-lisp
 ;; (load-theme 'material-light t)
 ;; (load-theme 'material t)
-#+end_src
 
-* TREEMACS
-- =treemacs= is a tree layout file explorer for Emacs ([[https://github.com/Alexander-Miller/treemacs][source]])
-- The following code contains treemacs' with all of its options and configurations in their default setting:
-  #+begin_src emacs-lisp
-  (use-package treemacs
-    :ensure t
-  )
-  #+end_src
+(use-package treemacs
+  :ensure t
+)
 
-* WHICH-KEY
-Provides suggested Emacs commands when having typed an incomplete command
-#+begin_src emacs-lisp
 (use-package which-key
   :ensure t
   :init
@@ -739,15 +407,10 @@ Provides suggested Emacs commands when having typed an incomplete command
         which-key-allow-imprecise-window-fit t
         which-key-separator " → ")
   )
-#+end_src
 
-
-* MISCELLANEOUS
-#+begin_src emacs-lisp
 (delete-selection-mode 1)    ;; You can select text and delete it by typing.
 (save-place-mode 1)          ;; Remember and restore the last cursor location of opened files
 (global-auto-revert-mode t)  ;; Automatically show changes if the file has changed
 ;; Required for gnupg (gpg) encryption works
 (defvar epa-pinentry-mode)
 (setq epa-pinentry-mode 'loopback)
-#+end_src

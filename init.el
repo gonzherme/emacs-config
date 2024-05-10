@@ -15,7 +15,7 @@
  '(org-safe-remote-resources
    '("\\`https://fniessen\\.github\\.io/org-html-themes/org/theme-readtheorg\\.setup\\'"))
  '(package-selected-packages
-   '(wolfram-mode wolfram websocket use-package treemacs spacemacs-theme sml-mode request realgud projectile polymode page-break-lines origami org-pdftools magit julia-mode gnu-elpa-keyring-update flycheck-pos-tip flycheck-color-mode-line eshell-syntax-highlighting dracula-theme deferred dashboard company-php company-math company-go company-bibtex company-auctex company-arduino color-theme-sanityinc-tomorrow beacon auto-complete-auctex anaphora all-the-icons)))
+   '(magit git-commit 0blayout wolfram-mode wolfram websocket use-package treemacs spacemacs-theme sml-mode request realgud projectile polymode page-break-lines origami org-pdftools julia-mode gnu-elpa-keyring-update flycheck-pos-tip flycheck-color-mode-line eshell-syntax-highlighting dracula-theme deferred dashboard company-php company-math company-go company-bibtex company-auctex company-arduino color-theme-sanityinc-tomorrow beacon auto-complete-auctex anaphora all-the-icons)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
