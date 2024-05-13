@@ -18,15 +18,17 @@ For example, org-mode-hook can contain a list of functions to be called after or
 * TABLE OF CONTENTS                                                     :toc:
 - [[#config-overview][Config Overview]]
 - [[#cheat-sheet][Cheat Sheet]]
-- [[#important-programs-to-load-first][IMPORTANT PROGRAMS TO LOAD FIRST]]
 - [[#package-management-system][Package Management System]]
   - [[#setup][Setup]]
   - [[#automatic-package-updates][Automatic Package Updates]]
   - [[#adding-custom-scripts-directory-to-path][Adding custom scripts directory to path]]
+- [[#nano][NANO]]
+  - [[#overriding-nano-font-lock-disactivated][Overriding nano font-lock (disactivated)]]
 - [[#auctex][AUCTEX]]
 - [[#backup-files][BACKUP FILES]]
 - [[#company][COMPANY]]
-- [[#dashboard][DASHBOARD]]
+  - [[#disable-company-in-shell][Disable Company in Shell]]
+- [[#dashboard-disactivated][DASHBOARD (disactivated)]]
 - [[#graphical-user-interface-tweaks][GRAPHICAL USER INTERFACE TWEAKS]]
   - [[#disable-menubar-toolbars-and-scrollbars][Disable Menubar, Toolbars, and Scrollbars]]
   - [[#display-line-numbers-and-truncated-lines][Display Line Numbers and Truncated Lines]]
@@ -57,7 +59,8 @@ For example, org-mode-hook can contain a list of functions to be called after or
 - [[#org-roam][Org Roam]]
   - [[#roam-setup][Roam setup]]
   - [[#org-roam-interactive-ui][Org Roam Interactive UI]]
-- [[#outshine][Outshine]]
+- [[#outli][Outli]]
+- [[#outshine-disactivated][Outshine (disactivated)]]
 - [[#pdf-tools][PDF TOOLS]]
 - [[#programming][PROGRAMMING]]
   - [[#automation][Automation]]
@@ -67,16 +70,11 @@ For example, org-mode-hook can contain a list of functions to be called after or
   - [[#custom-themes][Custom themes]]
   - [[#doom-themes][Doom Themes]]
   - [[#theme-changer-disactivated][Theme Changer (disactivated)]]
-  - [[#load-theme][Load theme]]
+  - [[#load-theme-disactivated][Load theme (disactivated)]]
 - [[#treemacs][TREEMACS]]
+- [[#ultra-scroll][ULTRA-SCROLL]]
 - [[#which-key][WHICH-KEY]]
 - [[#miscellaneous][MISCELLANEOUS]]
-
-* IMPORTANT PROGRAMS TO LOAD FIRST
-- To keep this config.org a reasonable length, I have moved a lot of code to individual scripts that will be sourced by this config.  These scripts are found in “~/.emacs.d/scripts” and do not contain any code that most people are likely to need to edit.
-
-- Note that to use scripts, at the end of each script file, you have to write: (provide 'file_name_without_.el)
-
 
 * Package Management System
 ** Setup
@@ -117,15 +115,79 @@ For example, org-mode-hook can contain a list of functions to be called after or
 (add-to-list 'load-path "~/.emacs.d/scripts/")
 #+end_src
 
+* NANO
+- =NANO= is a set of [[https://github.com/rougier][config files]] that provide Emacs a nice minimalistic, consistent, paper-like look and feel.
+- To *edit nano theme colors*, change the values in /nano-theme-light.el/ and /nano-theme-dark.el/
+- =M-x nano-toggle-theme= toggles light to dark nano themes  
+- Author: [[https://github.com/rougier][Rougier]]
+
+#+begin_src emacs-lisp
+(add-to-list 'load-path "~/.emacs.d/scripts/nano-emacs") ;; Path to nano emacs modules (mandatory)
+(require 'nano-layout) ;; Default layout (optional)
+
+;; Theming Command line options (this will cancel warning messages)
+(add-to-list 'command-switch-alist '("-dark"   . (lambda (args))))
+(add-to-list 'command-switch-alist '("-light"  . (lambda (args))))
+(add-to-list 'command-switch-alist '("-default"  . (lambda (args))))
+(add-to-list 'command-switch-alist '("-no-splash" . (lambda (args))))
+(add-to-list 'command-switch-alist '("-no-help" . (lambda (args))))
+(add-to-list 'command-switch-alist '("-compact" . (lambda (args))))
+
+;; Theme
+(require 'nano-faces)
+(require 'nano-theme)
+(require 'nano-theme-dark)
+(require 'nano-theme-light)
+
+(cond
+ ((member "-default" command-line-args) t)
+ ((member "-dark" command-line-args) (nano-theme-set-dark))
+ (t (nano-theme-set-light)))
+(call-interactively 'nano-refresh-theme)
+
+
+(require 'nano-defaults) ;; Nano default settings (optional)
+(require 'nano-modeline) ;; Nano header & mode lines (optional)
+(require 'nano-session) ;; Nano session saving (optional)
+
+(when (member "-compact" command-line-args) ;; Compact layout (need to be loaded after nano-modeline)
+  (require 'nano-compact))
+
+
+;; Welcome message (optional)
+(let ((inhibit-message t))
+  (message "Welcome to GNU Emacs / N Λ N O edition")
+  (message (format "Initialization time: %s" (emacs-init-time))))
+
+;; Splash (optional)
+(unless (member "-no-splash" command-line-args)
+  (require 'nano-splash))
+
+;; Help (optional)
+(unless (member "-no-help" command-line-args)
+  (require 'nano-help))
+#+end_src
+
+
+** Overriding nano font-lock (disactivated)
+- Font lock: programming mode syntax highlighting
+- Customize the colors of keywords
+#+begin_src emacs-lisp
+;; (custom-set-faces
+;;  '(font-lock-keyword-face ((t (:foreground "#0222E8"))))
+;;  ;;'(font-lock-function-name-face ((t (:foreground "#EB600D"))))
+;;  '(font-lock-function-name-face ((t (:foreground "#EA3001")))) 
+;;  '(font-lock-type-face ((t (:foreground "#61EAB3"))))
+;; )
+#+end_src
+
 
 
 * AUCTEX
 =auctex= is the standard Emacs Latex package
 
 #+begin_src emacs-lisp
-(use-package auctex
-  :ensure t
-)
+(use-package auctex)
 #+end_src
 
 
@@ -138,13 +200,11 @@ By default, Emacs creates automatic backups of files in their original directori
 #+end_src
 
 
-
 * COMPANY
 =company= is a text completion framework for Emacs. The name stands for “complete anything”. Completion will start automatically after you type a few letters. Use =M-n= and =M-p= to select, =<return>= to complete or =<tab>= to complete the common part.
 
 #+begin_src emacs-lisp
 (use-package company
-  :ensure t
   :defer 2
   :diminish
   :custom
@@ -154,39 +214,40 @@ By default, Emacs creates automatic backups of files in their original directori
   (company-show-numbers t)
   (company-tooltip-align-annotations 't)
   (global-company-mode t)
-  (setq company-global-modes '(not shell-mode)) ;; disable company when in shell
 )
 
-;; (use-package company-box
-;;   :ensure t
-;;   :after company
-;;   :diminish
-;;   :hook (company-mode . company-box-mode)
-;; )
+(use-package company-box
+  :after company
+  :diminish
+  :hook (company-mode . company-box-mode)
+)
 #+end_src
 
+** Disable Company in Shell
+#+begin_src emacs-lisp
+(add-hook 'shell-mode-hook (lambda () (company-mode -1)) 'append)
+#+end_src
 
-* DASHBOARD
+* DASHBOARD (disactivated)
 =dashboard= is an extensible startup screen showing you recent files, bookmarks, agenda items and an Emacs banner.
 #+begin_src emacs-lisp
-(use-package dashboard
-  :ensure t 
-  :init
-  (setq dashboard-set-heading-icons t)
-  (setq dashboard-set-file-icons t)
-  (setq dashboard-banner-logo-title "Emacs Is More Than A Text Editor!")
-;;   ;;(setq dashboard-startup-banner 'logo) ;; use standard emacs logo as banner
-  (setq dashboard-startup-banner "~/.emacs.d/images/multicolor-gnu.jpg")  ;; use custom image as banner
-  (setq dashboard-center-content nil) ;; set to 't' for centered content
-  (setq dashboard-items '((recents . 5)
-                          (agenda . 5 )
-                          (bookmarks . 3)
-                          (registers . 3)))
-  :custom
-  (dashboard-modify-heading-icons '((recents . "file-text")
-                                    (bookmarks . "book")))
-  :config
-  (dashboard-setup-startup-hook))
+;; (use-package dashboard
+;;   :init
+;;   (setq dashboard-set-heading-icons t)
+;;   (setq dashboard-set-file-icons t)
+;;   (setq dashboard-banner-logo-title "Emacs Is More Than A Text Editor!")
+;; ;;   ;;(setq dashboard-startup-banner 'logo) ;; use standard emacs logo as banner
+;;   (setq dashboard-startup-banner "~/.emacs.d/images/multicolor-gnu.jpg")  ;; use custom image as banner
+;;   (setq dashboard-center-content nil) ;; set to 't' for centered content
+;;   (setq dashboard-items '((recents . 5)
+;;                           (agenda . 5 )
+;;                           (bookmarks . 3)
+;;                           (registers . 3)))
+;;   :custom
+;;   (dashboard-modify-heading-icons '((recents . "file-text")
+;;                                     (bookmarks . "book")))
+;;   :config
+;;   (dashboard-setup-startup-hook))
 #+end_src
 
 * GRAPHICAL USER INTERFACE TWEAKS
@@ -208,13 +269,12 @@ More minimal user interface
 ** Window size on startup
 #+begin_src emacs-lisp
 ;; full screen
-(add-to-list 'default-frame-alist '(fullscreen . maximized))
+;;(add-to-list 'default-frame-alist '(fullscreen . maximized))
 
 ;; specific height and width
-;;(add-to-list 'default-frame-alist '(height . 50))
-;;(add-to-list 'default-frame-alist '(width . 100))
+(add-to-list 'default-frame-alist '(height . 50))
+(add-to-list 'default-frame-alist '(width . 100))
 #+end_src
-
 
 ** Fonts: type, size
 #+begin_src emacs-lisp
@@ -232,11 +292,9 @@ This is an icon set that can be used with dashbaord, dired, ibuffer, and other E
 
 #+begin_src emacs-lisp
 (use-package all-the-icons
-  :ensure t
   :if (display-graphic-p))
 
 (use-package all-the-icons-dired
-  :ensure t
   :hook (dired-mode . (lambda () (all-the-icons-dired-mode t))))
 #+end_src
 
@@ -245,8 +303,7 @@ This is an icon set that can be used with dashbaord, dired, ibuffer, and other E
 =diminish= implements hiding or abbreviation of the modeline displays (lighters) of minor-modes.  With this package installed, you can add =:diminish= to any use-package block to hide that particular mode in the modeline.
 
 #+begin_src emacs-lisp
-(use-package diminish
-  :ensure t)
+(use-package diminish)
 #+end_src
 
 * FLYCHECK
@@ -254,7 +311,6 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
 
 #+begin_src emacs-lisp
 (use-package flycheck
-  :ensure t
   :defer t
   :diminish ;;explanation of what diminish does, search for "DIMINISH"
   :init (global-flycheck-mode))
@@ -268,7 +324,6 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
 
 #+begin_src emacs-lisp
 (use-package git-timemachine
-  :ensure t
   :after git-timemachine
   :hook (evil-normalize-keymaps . git-timemachine-hook)
   :config
@@ -282,9 +337,7 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
 ** MAGIT
 [[https://magit.vc/manual/][Magit]] is the full-featured git client for Emacs.
 #+begin_src emacs-lisp
-(use-package magit
-  :ensure t
-)
+(use-package magit)
 #+end_src
 
 
@@ -295,7 +348,6 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
 
 #+begin_src emacs-lisp
 (use-package ivy
-  :ensure t
   :custom
   (setq ivy-use-virtual-buffers t)
   (setq ivy-count-format "(%d/%d) ")
@@ -305,23 +357,19 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
 
 
 (use-package counsel
-  :ensure t
   :after ivy
   :config (counsel-mode))
 
 (use-package all-the-icons-ivy-rich
-  :ensure t
   :init (all-the-icons-ivy-rich-mode 1))
 
 (use-package ivy-rich
-  :ensure t
   :after ivy
   :init (ivy-rich-mode 1) ;; this gets us descriptions in M-x
   :custom
   (ivy-virtual-abbreviate 'full
    ivy-rich-switch-buffer-align-virtual-buffer t
    ivy-rich-path-style 'abbrev))
-
 #+end_src
 
 
@@ -335,7 +383,6 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
 ** Enabling Table of Contents
 #+begin_src emacs-lisp
 (use-package toc-org
-  :ensure t
   :commands toc-org-enable
   :init (add-hook 'org-mode-hook 'toc-org-enable))
 #+end_src
@@ -361,8 +408,7 @@ For more info on Flycheck, click [[https://www.flycheck.org/en/latest/languages.
 
 #+begin_src emacs-lisp
 (add-hook 'org-mode-hook 'org-indent-mode)
-(use-package org-bullets
-  :ensure t)
+(use-package org-bullets)
 (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1)))
 #+end_src
 
@@ -515,7 +561,6 @@ Can execute code blocks using =C-c C-c=
 ** Roam setup
 #+begin_src emacs-lisp
 (use-package org-roam
-  :ensure t
   :init
   (setq org-roam-v2-ack t)
   :custom
@@ -536,11 +581,9 @@ Can execute code blocks using =C-c C-c=
 #+begin_src emacs-lisp
 ;; Required dependencies for ui graph package
 (use-package websocket
-  :ensure t
   :after org-roam)
 
 (use-package org-roam-ui
-    :ensure t
     :after org-roam
     :config
     (setq org-roam-ui-sync-theme t
@@ -550,17 +593,28 @@ Can execute code blocks using =C-c C-c=
 #+end_src
 
 
-* Outshine
+* Outli
+=outli= is a simple and stylish [[https://github.com/jdtsmith/outli][comment-based outlines]] with speed keys for Emacs
+
+#+begin_src emacs-lisp
+(use-package outli
+  :load-path "./scripts/outli/"
+  :bind (:map outli-mode-map ; convenience key to get back to containing heading
+	      ("C-c C-p" . (lambda () (interactive) (outline-back-to-heading))))
+  :hook ((prog-mode text-mode) . outli-mode) ; programming modes
+)  
+#+end_src
+
+* Outshine (disactivated)
 =outshine= adds an org-mode functionality to any non-org mode you'd like. ([[https://github.com/alphapapa/outshine][Source]])
 
 #+begin_src emacs-lisp
-(use-package outshine
-  :ensure t
-  :config
-  (add-hook 'python-mode-hook 'outshine-mode)
-  (add-hook 'c-mode-hook 'outshine-mode)
-  (add-hook 'cpp-mode-hook 'outshine-mode)
-)
+;; (use-package outshine
+;;   :config
+;;   (add-hook 'python-mode-hook 'outshine-mode)
+;;   (add-hook 'c-mode-hook 'outshine-mode)
+;;   (add-hook 'cpp-mode-hook 'outshine-mode)
+;; )
 #+end_src
 
 
@@ -608,10 +662,8 @@ PDF tools is the package used for viewing PDFs (an alternative to Skim, Preview)
 + [[https://www.gnu.org/software/emacs/manual/html_node/efaq/Associating-modes-with-files.html][How do I make Emacs use a certain major mode for certain files?]]
 
 #+begin_src emacs-lisp
-(use-package haskell-mode
-  :ensure t)
-(use-package php-mode
-  :ensure t)
+(use-package haskell-mode)
+(use-package php-mode)
 #+end_src
 
 *** c0
@@ -657,7 +709,6 @@ serpent-mode.el has been loaded when starting emacs, when loading the scripts fo
 
 ;; Dom themes: [https://github.com/doomemacs/themes]
 (use-package doom-themes
-  :ensure t
   :config
   (setq doom-themes-enable-bold t ; if nil, bold is universally disabled
         doom-themes-enable-italic t) ; if nil, italics is universally disabled
@@ -688,7 +739,6 @@ serpent-mode.el has been loaded when starting emacs, when loading the scripts fo
 
 
 ;; (use-package theme-changer
-;;   :ensure t
 ;;   :config
 ;;   (change-theme 'leuven 'doom-Iosvkem)
 ;;   ;; (change-theme 'doom-Iosvkem 'doom-Iosvkem)
@@ -696,7 +746,7 @@ serpent-mode.el has been loaded when starting emacs, when loading the scripts fo
 ;; )
 #+end_src
 
-** Load theme
+** Load theme (disactivated)
 #+begin_src emacs-lisp
 #+end_src
 
@@ -704,16 +754,28 @@ serpent-mode.el has been loaded when starting emacs, when loading the scripts fo
 - =treemacs= is a tree layout file explorer for Emacs ([[https://github.com/Alexander-Miller/treemacs][source]])
 - The following code contains treemacs' with all of its options and configurations in their default setting:
   #+begin_src emacs-lisp
-  (use-package treemacs
-    :ensure t
-  )
+  (use-package treemacs)
   #+end_src
+
+* ULTRA-SCROLL
+- Improves =emacs-mac= scrolling experience.
+- Elisp code located in scripts folder, pulled from [[https://github.com/jdtsmith/ultra-scroll-mac][jdtsmith]]
+
+#+begin_src emacs-lisp
+(use-package ultra-scroll-mac
+  :if (eq window-system 'mac)
+  :load-path "./scripts/ultra-scroll-mac/" ; if you git clone'd instead of package-vc-install
+  :init
+  (setq scroll-conservatively 101 ; important!
+        scroll-margin 0) 
+  :config
+  (ultra-scroll-mac-mode 1))
+#+end_src
 
 * WHICH-KEY
 Provides suggested Emacs commands when having typed an incomplete command
 #+begin_src emacs-lisp
 (use-package which-key
-  :ensure t
   :init
     (which-key-mode 1)
   :diminish

@@ -27,16 +27,63 @@
 
 (add-to-list 'load-path "~/.emacs.d/scripts/")
 
-;; (require 'elpaca-setup)  ;; The Elpaca Package Manager
+(add-to-list 'load-path "~/.emacs.d/scripts/nano-emacs") ;; Path to nano emacs modules (mandatory)
+(require 'nano-layout) ;; Default layout (optional)
 
-(use-package auctex
-  :ensure t
-)
+;; Theming Command line options (this will cancel warning messages)
+(add-to-list 'command-switch-alist '("-dark"   . (lambda (args))))
+(add-to-list 'command-switch-alist '("-light"  . (lambda (args))))
+(add-to-list 'command-switch-alist '("-default"  . (lambda (args))))
+(add-to-list 'command-switch-alist '("-no-splash" . (lambda (args))))
+(add-to-list 'command-switch-alist '("-no-help" . (lambda (args))))
+(add-to-list 'command-switch-alist '("-compact" . (lambda (args))))
+
+;; Theme
+(require 'nano-faces)
+(require 'nano-theme)
+(require 'nano-theme-dark)
+(require 'nano-theme-light)
+
+(cond
+ ((member "-default" command-line-args) t)
+ ((member "-dark" command-line-args) (nano-theme-set-dark))
+ (t (nano-theme-set-light)))
+(call-interactively 'nano-refresh-theme)
+
+
+(require 'nano-defaults) ;; Nano default settings (optional)
+(require 'nano-modeline) ;; Nano header & mode lines (optional)
+(require 'nano-session) ;; Nano session saving (optional)
+
+(when (member "-compact" command-line-args) ;; Compact layout (need to be loaded after nano-modeline)
+  (require 'nano-compact))
+
+
+;; Welcome message (optional)
+(let ((inhibit-message t))
+  (message "Welcome to GNU Emacs / N Λ N O edition")
+  (message (format "Initialization time: %s" (emacs-init-time))))
+
+;; Splash (optional)
+(unless (member "-no-splash" command-line-args)
+  (require 'nano-splash))
+
+;; Help (optional)
+(unless (member "-no-help" command-line-args)
+  (require 'nano-help))
+
+;; (custom-set-faces
+;;  '(font-lock-keyword-face ((t (:foreground "#0222E8"))))
+;;  ;;'(font-lock-function-name-face ((t (:foreground "#EB600D"))))
+;;  '(font-lock-function-name-face ((t (:foreground "#EA3001")))) 
+;;  '(font-lock-type-face ((t (:foreground "#61EAB3"))))
+;; )
+
+(use-package auctex)
 
 (setq backup-directory-alist '((".*" . "~/.local/share/Trash/files")))
 
 (use-package company
-  :ensure t
   :defer 2
   :diminish
   :custom
@@ -46,34 +93,33 @@
   (company-show-numbers t)
   (company-tooltip-align-annotations 't)
   (global-company-mode t)
-  (setq company-global-modes '(not shell-mode)) ;; disable company when in shell
 )
 
-;; (use-package company-box
-;;   :ensure t
-;;   :after company
-;;   :diminish
-;;   :hook (company-mode . company-box-mode)
-;; )
+(use-package company-box
+  :after company
+  :diminish
+  :hook (company-mode . company-box-mode)
+)
 
-(use-package dashboard
-  :ensure t 
-  :init
-  (setq dashboard-set-heading-icons t)
-  (setq dashboard-set-file-icons t)
-  (setq dashboard-banner-logo-title "Emacs Is More Than A Text Editor!")
-;;   ;;(setq dashboard-startup-banner 'logo) ;; use standard emacs logo as banner
-  (setq dashboard-startup-banner "~/.emacs.d/images/multicolor-gnu.jpg")  ;; use custom image as banner
-  (setq dashboard-center-content nil) ;; set to 't' for centered content
-  (setq dashboard-items '((recents . 5)
-                          (agenda . 5 )
-                          (bookmarks . 3)
-                          (registers . 3)))
-  :custom
-  (dashboard-modify-heading-icons '((recents . "file-text")
-                                    (bookmarks . "book")))
-  :config
-  (dashboard-setup-startup-hook))
+(add-hook 'shell-mode-hook (lambda () (company-mode -1)) 'append)
+
+;; (use-package dashboard
+;;   :init
+;;   (setq dashboard-set-heading-icons t)
+;;   (setq dashboard-set-file-icons t)
+;;   (setq dashboard-banner-logo-title "Emacs Is More Than A Text Editor!")
+;; ;;   ;;(setq dashboard-startup-banner 'logo) ;; use standard emacs logo as banner
+;;   (setq dashboard-startup-banner "~/.emacs.d/images/multicolor-gnu.jpg")  ;; use custom image as banner
+;;   (setq dashboard-center-content nil) ;; set to 't' for centered content
+;;   (setq dashboard-items '((recents . 5)
+;;                           (agenda . 5 )
+;;                           (bookmarks . 3)
+;;                           (registers . 3)))
+;;   :custom
+;;   (dashboard-modify-heading-icons '((recents . "file-text")
+;;                                     (bookmarks . "book")))
+;;   :config
+;;   (dashboard-setup-startup-hook))
 
 (menu-bar-mode -1)
 (tool-bar-mode -1)
@@ -83,11 +129,11 @@
 (global-visual-line-mode t)
 
 ;; full screen
-(add-to-list 'default-frame-alist '(fullscreen . maximized))
+;;(add-to-list 'default-frame-alist '(fullscreen . maximized))
 
 ;; specific height and width
-;;(add-to-list 'default-frame-alist '(height . 50))
-;;(add-to-list 'default-frame-alist '(width . 100))
+(add-to-list 'default-frame-alist '(height . 50))
+(add-to-list 'default-frame-alist '(width . 100))
 
 (set-face-attribute 'default nil
 	:height 150
@@ -98,24 +144,19 @@
    :slant 'italic)
 
 (use-package all-the-icons
-  :ensure t
   :if (display-graphic-p))
 
 (use-package all-the-icons-dired
-  :ensure t
   :hook (dired-mode . (lambda () (all-the-icons-dired-mode t))))
 
-(use-package diminish
-  :ensure t)
+(use-package diminish)
 
 (use-package flycheck
-  :ensure t
   :defer t
   :diminish ;;explanation of what diminish does, search for "DIMINISH"
   :init (global-flycheck-mode))
 
 (use-package git-timemachine
-  :ensure t
   :after git-timemachine
   :hook (evil-normalize-keymaps . git-timemachine-hook)
   :config
@@ -123,12 +164,9 @@
     (evil-define-key 'normal git-timemachine-mode-map (kbd "C-k") 'git-timemachine-show-next-revision)
 )
 
-(use-package magit
-  :ensure t
-)
+(use-package magit)
 
 (use-package ivy
-  :ensure t
   :custom
   (setq ivy-use-virtual-buffers t)
   (setq ivy-count-format "(%d/%d) ")
@@ -138,16 +176,13 @@
 
 
 (use-package counsel
-  :ensure t
   :after ivy
   :config (counsel-mode))
 
 (use-package all-the-icons-ivy-rich
-  :ensure t
   :init (all-the-icons-ivy-rich-mode 1))
 
 (use-package ivy-rich
-  :ensure t
   :after ivy
   :init (ivy-rich-mode 1) ;; this gets us descriptions in M-x
   :custom
@@ -158,7 +193,6 @@
 (require 'org)
 
 (use-package toc-org
-  :ensure t
   :commands toc-org-enable
   :init (add-hook 'org-mode-hook 'toc-org-enable))
 
@@ -175,8 +209,7 @@
  )
 
 (add-hook 'org-mode-hook 'org-indent-mode)
-(use-package org-bullets
-  :ensure t)
+(use-package org-bullets)
 (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1)))
 
 (setq org-edit-src-content-indentation 0) ;; sets org code indentation to 0 spaces by default
@@ -267,7 +300,6 @@
 )
 
 (use-package org-roam
-  :ensure t
   :init
   (setq org-roam-v2-ack t)
   :custom
@@ -285,11 +317,9 @@
 
 ;; Required dependencies for ui graph package
 (use-package websocket
-  :ensure t
   :after org-roam)
 
 (use-package org-roam-ui
-    :ensure t
     :after org-roam
     :config
     (setq org-roam-ui-sync-theme t
@@ -297,13 +327,19 @@
           org-roam-ui-update-on-save t
           org-roam-ui-open-on-start t))
 
-(use-package outshine
-  :ensure t
-  :config
-  (add-hook 'python-mode-hook 'outshine-mode)
-  (add-hook 'c-mode-hook 'outshine-mode)
-  (add-hook 'cpp-mode-hook 'outshine-mode)
+(use-package outli
+  :load-path "./scripts/outli/"
+  :bind (:map outli-mode-map ; convenience key to get back to containing heading
+	      ("C-c C-p" . (lambda () (interactive) (outline-back-to-heading))))
+  :hook ((prog-mode text-mode) . outli-mode) ; programming modes
 )
+
+;; (use-package outshine
+;;   :config
+;;   (add-hook 'python-mode-hook 'outshine-mode)
+;;   (add-hook 'c-mode-hook 'outshine-mode)
+;;   (add-hook 'cpp-mode-hook 'outshine-mode)
+;; )
 
 ;; Helps avois blurry PDFs on Mac retina display
 (setq pdf-view-use-scaling t)
@@ -329,10 +365,8 @@
 
 (electric-pair-mode 1) ;; auto fill parentheses
 
-(use-package haskell-mode
-  :ensure t)
-(use-package php-mode
-  :ensure t)
+(use-package haskell-mode)
+(use-package php-mode)
 
 (add-to-list 'auto-mode-alist '("\\.c0\\'" . c-mode)) ;; turn on C-mode with any file ending in .c0
 
@@ -351,7 +385,6 @@
 
 ;; Dom themes: [https://github.com/doomemacs/themes]
 (use-package doom-themes
-  :ensure t
   :config
   (setq doom-themes-enable-bold t ; if nil, bold is universally disabled
         doom-themes-enable-italic t) ; if nil, italics is universally disabled
@@ -374,22 +407,26 @@
 
 
 ;; (use-package theme-changer
-;;   :ensure t
 ;;   :config
 ;;   (change-theme 'leuven 'doom-Iosvkem)
 ;;   ;; (change-theme 'doom-Iosvkem 'doom-Iosvkem)
   
 ;; )
 
-;; (load-theme 'material-light t)
-;; (load-theme 'material t)
 
-(use-package treemacs
-  :ensure t
-)
+
+(use-package treemacs)
+
+(use-package ultra-scroll-mac
+  :if (eq window-system 'mac)
+  :load-path "./scripts/ultra-scroll-mac/" ; if you git clone'd instead of package-vc-install
+  :init
+  (setq scroll-conservatively 101 ; important!
+        scroll-margin 0) 
+  :config
+  (ultra-scroll-mac-mode 1))
 
 (use-package which-key
-  :ensure t
   :init
     (which-key-mode 1)
   :diminish
