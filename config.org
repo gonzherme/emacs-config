@@ -73,6 +73,7 @@ For example, org-mode-hook can contain a list of functions to be called after or
   - [[#load-theme-disactivated][Load theme (disactivated)]]
 - [[#treemacs][TREEMACS]]
 - [[#ultra-scroll][ULTRA-SCROLL]]
+- [[#vterm][VTERM]]
 - [[#which-key][WHICH-KEY]]
 - [[#miscellaneous][MISCELLANEOUS]]
 
@@ -284,7 +285,7 @@ More minimal user interface
 
 ;; Sets commented regions to itallic
 (set-face-attribute 'font-lock-comment-face nil
-   :slant 'italic)
+   :slant 'italic)pp
 #+end_src
 
 * ALL THE ICONS
@@ -770,6 +771,18 @@ serpent-mode.el has been loaded when starting emacs, when loading the scripts fo
         scroll-margin 0) 
   :config
   (ultra-scroll-mac-mode 1))
+#+end_src
+
+* VTERM
+An [[https://github.com/akermu/emacs-libvterm/][improved terminal emulator package]] which uses a compiled native module to interact with the underlying terminal applications.
+#+begin_src emacs-lisp
+(use-package vterm
+  :commands vterm
+  :config
+  (setq term-prompt-regexp "^[^#$%>\n]*[#$%>] *")  ;; Set this to match your custom shell prompt
+  (setq vterm-shell "zsh")                       ;; Set this to customize the shell to launch
+  (setq vterm-max-scrollback 10000))
+
 #+end_src
 
 * WHICH-KEY
