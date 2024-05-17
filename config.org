@@ -25,6 +25,7 @@ For example, org-mode-hook can contain a list of functions to be called after or
 - [[#nano][NANO]]
   - [[#overriding-nano-font-lock-disactivated][Overriding nano font-lock (disactivated)]]
 - [[#auctex][AUCTEX]]
+  - [[#setting-xetex-to-be-the-default-typesetting-engine][Setting Xetex to be the default typesetting engine]]
 - [[#backup-files][BACKUP FILES]]
 - [[#company][COMPANY]]
   - [[#disable-company-in-shell][Disable Company in Shell]]
@@ -191,6 +192,22 @@ For example, org-mode-hook can contain a list of functions to be called after or
 (use-package auctex)
 #+end_src
 
+** Setting Xetex to be the default typesetting engine
+
+This is required for properly compiling some external latex packages, like =fontspec= 
+#+begin_src emacs-lisp
+(use-package tex
+  :ensure auctex
+  :init
+  ;; Set default TeX engine to xetex
+  (setq TeX-engine 'xetex)
+  ;; or for LuaLaTeX, uncomment the following line and comment out the XeTeX line
+  ;; (setq TeX-engine 'luatex)
+  (setq TeX-PDF-mode t)
+  :config
+  ;; Use LaTeX-mode for .tex files
+  (add-hook 'LaTeX-mode-hook 'TeX-PDF-mode))
+#+end_src
 
 
 * BACKUP FILES
@@ -285,7 +302,7 @@ More minimal user interface
 
 ;; Sets commented regions to itallic
 (set-face-attribute 'font-lock-comment-face nil
-   :slant 'italic)pp
+   :slant 'italic)
 #+end_src
 
 * ALL THE ICONS
