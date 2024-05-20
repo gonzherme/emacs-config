@@ -206,7 +206,8 @@ This is required for properly compiling some external latex packages, like =font
   (setq TeX-PDF-mode t)
   :config
   ;; Use LaTeX-mode for .tex files
-  (add-hook 'LaTeX-mode-hook 'TeX-PDF-mode))
+  (add-hook 'LaTeX-mode-hook 'TeX-PDF-mode)
+)
 #+end_src
 
 

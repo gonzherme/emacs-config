@@ -81,6 +81,19 @@
 
 (use-package auctex)
 
+(use-package tex
+  :ensure auctex
+  :init
+  ;; Set default TeX engine to xetex
+  (setq TeX-engine 'xetex)
+  ;; or for LuaLaTeX, uncomment the following line and comment out the XeTeX line
+  ;; (setq TeX-engine 'luatex)
+  (setq TeX-PDF-mode t)
+  :config
+  ;; Use LaTeX-mode for .tex files
+  (add-hook 'LaTeX-mode-hook 'TeX-PDF-mode)
+)
+
 (setq backup-directory-alist '((".*" . "~/.local/share/Trash/files")))
 
 (use-package company
