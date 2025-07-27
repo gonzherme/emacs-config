@@ -18,7 +18,7 @@
 
 (use-package auto-package-update
   :custom
-  (auto-package-update-interval 7)
+  (auto-package-update-interval 60)
   (auto-package-update-prompt-before-update t)
   (auto-package-update-hide-results t)
   :config
@@ -133,6 +133,12 @@
 (scroll-bar-mode -1) ;; no scroll bars
 ;; (add-to-list 'default-frame-alist '(undecorated . t)) ;; remove apple window bar
 
+
+(add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
+(add-to-list 'default-frame-alist '(ns-appearance . dark))
+(setq ns-use-proxy-icon nil)
+(setq frame-title-format nil)
+
 (add-hook 'prog-mode-hook #'display-line-numbers-mode) ;; display line nums in progr mode
 (global-visual-line-mode t) ;; lines wrap around
 
@@ -189,6 +195,29 @@
 )
 
 (use-package magit)
+
+(use-package diff-hl
+  :ensure t
+  :hook ((prog-mode . diff-hl-mode)
+         (dired-mode . diff-hl-dired-mode))
+  :config
+  (add-hook 'magit-post-refresh-hook 'diff-hl-magit-post-refresh)
+  (diff-hl-flydiff-mode) ;; real-time updating
+)
+
+(use-package grip-mode
+  :ensure t
+  ;; :commands (grip-mode grip-show-preview)
+  :hook (markdown-mode . grip-mode)
+  :config
+  ;; split vertically
+  (setq split-width-threshold 0)
+  (setq split-height-threshold nil)
+
+
+(use-package markdown-mode
+  :ensure t
+  :mode ("\\.md\\'" . markdown-mode))
 
 ; Hide modeline mode: (source: https://protesilaos.com/codelog/2020-07-16-emacs-focused-editing/)
 (define-minor-mode hidden-mode-line-mode
@@ -302,33 +331,33 @@
 	       '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold :height 0.8))))
 	       '(org-verbatim ((t (:inherit (shadow fixed-pitch)))))))))
 
-(use-package org-roam
-  :init
-  (setq org-roam-v2-ack t)
-  :custom
-  (org-roam-directory "~/gonz/Obsidian")
-  (org-roam-completion-everywhere t)
-  :bind (("C-c r t" . org-roam-buffer-toggle)
-         ("C-c r f" . org-roam-node-find)
-         ("C-c r i" . org-roam-node-insert)
-	     ("C-c r g" . org-roam-ui-open)
-	     ("C-c r G" . org-roam-graph)
-	    )
-  :config
-  (org-roam-db-autosync-mode)
-  (org-roam-setup))
+;; (use-package org-roam
+;;   :init
+;;   (setq org-roam-v2-ack t)
+;;   :custom
+;;   (org-roam-directory "~/gonz/Obsidian")
+;;   (org-roam-completion-everywhere t)
+;;   :bind (("C-c r t" . org-roam-buffer-toggle)
+;;          ("C-c r f" . org-roam-node-find)
+;;          ("C-c r i" . org-roam-node-insert)
+;; 	     ("C-c r g" . org-roam-ui-open)
+;; 	     ("C-c r G" . org-roam-graph)
+;; 	    )
+;;   :config
+;;   (org-roam-db-autosync-mode)
+;;   (org-roam-setup))
 
-;; Required dependencies for ui graph package
-(use-package websocket
-  :after org-roam)
+;; ;; Required dependencies for ui graph package
+;; (use-package websocket
+;;   :after org-roam)
 
-(use-package org-roam-ui
-    :after org-roam
-    :config
-    (setq org-roam-ui-sync-theme t
-          org-roam-ui-follow t
-          org-roam-ui-update-on-save t
-          org-roam-ui-open-on-start t))
+;; (use-package org-roam-ui
+;;     :after org-roam
+;;     :config
+;;     (setq org-roam-ui-sync-theme t
+;;           org-roam-ui-follow t
+;;           org-roam-ui-update-on-save t
+;;           org-roam-ui-open-on-start t))
 
 (add-hook 'prog-mode-hook #'display-line-numbers-mode) ;; enable line numbers only in programming modes
 (add-hook 'prog-mode-hook #'olivetti-mode)
@@ -337,6 +366,41 @@
 
 (use-package haskell-mode)
 (use-package php-mode)
+
+(use-package lsp-mode
+  :ensure t
+  :commands (lsp lsp-deferred)
+  :hook ((python-mode . lsp-deferred)
+         (c-mode . lsp-deferred)
+	 (c++-mode . lsp-deferred)
+         (go-mode . lsp-deferred))
+  :config
+  (global-set-key [C-mouse-1] #'lsp-ui-peek-find-definitions)
+  (setq lsp-headerline-breadcrumb-enable 1)) ; we'll use a different method for function tracking
+
+(use-package lsp-ui
+  :ensure t
+  :after lsp-mode
+  :commands lsp-ui-mode
+  :hook (lsp-mode . lsp-ui-mode)
+  :config
+  (lsp-enable-which-key-integration t)
+  (setq lsp-ui-doc-enable t
+        lsp-ui-doc-include-signature t
+        lsp-ui-sideline-enable nil ;; disable sideline
+        lsp-ui-doc-position 'at-point   ;; where to show the popup
+        lsp-ui-doc-show-with-cursor nil ;; don't show popup if (text) cursor is on word
+        lsp-ui-doc-show-with-mouse t)) ;; shows variable/function info when mouse hovers over
+
+;; Run: npm install -g pyright
+(use-package lsp-pyright
+  :ensure t
+  :hook (python-mode . (lambda () (require 'lsp-pyright) (lsp))))
+
+(use-package exec-path-from-shell
+  :ensure t
+  :config
+  (exec-path-from-shell-initialize))
 
 ;; Major mode for OCaml programming
 (use-package tuareg
@@ -431,7 +495,8 @@
 ;;   ;; (change-theme 'material-light 'material-light)
 ;;   (change-theme 'spacemacs-light 'spacemacs-dark)
 ;; )
-(load-theme 'spacemacs-light t)
+;;(load-theme 'spacemacs-light t)
+(load-theme 'doom-spacegrey t)
 
 (use-package vterm
   :commands vterm
@@ -445,7 +510,44 @@
 (global-auto-revert-mode t)  ;; Automatically show changes if the file has changed
 ;; Required for gnupg (gpg) encryption to work
 
-(global-unset-key (kbd "C-z")) ;; remove C-z as the window minimization
+;; undo and redo
+(use-package undo-fu
+  :config
+  (global-unset-key (kbd "C-z"))
+  (global-set-key (kbd "M-z")   'undo-fu-only-undo)
+  (global-set-key (kbd "M-S-z") 'undo-fu-only-redo))
+
+;; apply copy/cut/delete to entire line
+(use-package whole-line-or-region
+  :ensure t
+  :config
+  (whole-line-or-region-global-mode))
+
+;; indent entire region with a tab or unindent shift tab
+;; (add-hook 'prog-mode-hook
+;;   (lambda ()
+;;     (local-set-key (kbd "TAB")
+;;       (lambda () (when (use-region-p)
+;;                    (indent-rigidly (region-beginning) (region-end) 4))))
+;;     (local-set-key (kbd "S-TAB")
+;;       (lambda () (when (use-region-p)
+;;                    (indent-rigidly (region-beginning) (region-end) -4))))))
+
+;; highlight all occurrences of word selected / cursor at
+(use-package symbol-overlay
+  :ensure t
+  :hook (prog-mode . symbol-overlay-mode))
+
+(global-unset-key [S-mouse-1])
+(setq shift-select-mode t)
+
+;; Make Shift + mouse-1 set the point (start selection)
+(global-set-key [S-mouse-1] 'mouse-set-point)
+
+;; Make Shift + drag extend the selection
+(global-set-key [S-down-mouse-1] 'mouse-save-then-kill)
+(global-set-key [S-drag-mouse-1] 'mouse-drag-region)
+
 (global-unset-key (kbd "C-_")) ;; remove C-S-_ to undo
 (global-unset-key (kbd "C-y")) ;; remove  C-y to yank
 (global-unset-key (kbd "C-x h")) ;; remove C-x h to select all 
@@ -463,16 +565,41 @@
   (setq scroll-conservatively 101 ; important!
         scroll-margin 0) 
   :config
+  (setq ultra-scroll-increment 0)        ;; smaller = smoother scroll steps
+  (setq ultra-scroll-delay 0)           ;; lower = faster animation frames  
   (ultra-scroll-mac-mode 1))
+
+
+;; (use-package good-scroll
+;;   :ensure t
+;;   :config
+;;   ;; Disable native pixel scroll (optional)
+;;   (when (fboundp 'pixel-scroll-precision-mode)
+;;     (pixel-scroll-precision-mode -1))
+;;   (good-scroll-mode 1))
+
+(pixel-scroll-precision-mode 1)
+(setq pixel-scroll-precision-use-momentum t)     ;; enable inertial/momentum scrolling
+(setq pixel-scroll-precision-interpolation-factor 0.0005) ;; speed of scroll animation
+(setq pixel-scroll-precision-large-scroll-height 20)  ;; default is 100
 
 (use-package flycheck
   :defer t
   :diminish ;;explanation of what diminish does, search for "DIMINISH"
   :init (global-flycheck-mode))
 
-(setq backup-directory-alist '((".*" . "~/.local/share/Trash/files")))
+(use-package real-auto-save
+  :ensure t
+  :init
+  (setq real-auto-save-interval 1) ;; in seconds
+  :config
+  (add-hook 'find-file-hook #'real-auto-save-mode) ;; apply to any opened file
+)
 
-(setq delete-old-versions t) ;; Don't ask to delete excess backup versions.
+(setq make-backup-files nil)  ;; Disable backup files like file~
+(setq auto-save-default nil)  ;; Disable auto-save files like #file#
+
+(setq initial-major-mode 'org-mode)
 
 ;; (defun ar/show-welcome-buffer ()
 ;;   "Show *Welcome* buffer."
