@@ -46,14 +46,32 @@
 (global-set-key [S-down-mouse-1] 'mouse-save-then-kill)
 (global-set-key [S-drag-mouse-1] 'mouse-drag-region)
 
+(defun my/backward-delete-word-no-clipboard ()
+  "Delete previous word without affecting the clipboard."
+  (interactive)
+  (let ((p (point)))
+    (backward-word 1)
+    (delete-region (point) p)))
+
+(global-set-key (kbd "M-<backspace>") #'my/backward-delete-word-no-clipboard)
+
+;; config
 (defun config ()
   (interactive)
   ;; (delete-other-windows)
   (find-file "~/.emacs.d/config.org")
 )
 
+;; cs
+(defun cs ()
+  (interactive)
+  ;; (delete-other-windows)
+  (dired "~/gonz/cs")
+)
+
 (setq inhibit-startup-screen t)
 (setq initial-scratch-message nil)
+
 ;; startup scratch buffer as org mode
 (setq initial-major-mode 'org-mode)
 
@@ -61,7 +79,7 @@
 (tool-bar-mode -1) ;; no toolbars
 (scroll-bar-mode -1) ;; no scroll bars
 
-;; transparent titlebar
+;; transparent title bar
 (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
 (add-to-list 'default-frame-alist '(ns-appearance . dark))
 (setq ns-use-proxy-icon nil)
@@ -69,6 +87,12 @@
 
 (add-hook 'prog-mode-hook #'display-line-numbers-mode) ;; display line nums in progr mode
 (global-visual-line-mode t) ;; lines wrap around
+
+;; hide macOS title bar
+(add-to-list 'default-frame-alist '(undecorated . t))
+;; add very thin borders to be able to drag
+(add-to-list 'default-frame-alist '(internal-border-width . 1))
+(add-to-list 'default-frame-alist '(drag-internal-border . t))
 
 ;; imported doom themes
 (use-package doom-themes
@@ -80,8 +104,12 @@
 
 ;; custom themes
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
+
 ;; current theme
-(load-theme 'doom-spacegrey t)
+;; (load-theme 'doom-spacegrey t)
+;; (load-theme 'doom-acario-light t)
+(load-theme 'doom-moonlight t)
+
 ;; cursor width
 (setq-default cursor-type '(bar . 2))
 
@@ -132,10 +160,19 @@
   :config
   (setq-default olivetti-body-width 100))
 
-(pixel-scroll-precision-mode 1)
-(setq pixel-scroll-precision-use-momentum t)     ;; enable inertial/momentum scrolling
-(setq pixel-scroll-precision-interpolation-factor 0.0005) ;; speed of scroll animation
-(setq pixel-scroll-precision-large-scroll-height 20)  ;; default is 100
+;; Emacs-mac
+(mac-mouse-wheel-mode 1)
+(setq mac-mouse-wheel-smooth-scroll t)
+
+;; Non emacs-mac
+;; (pixel-scroll-precision-mode 1)
+;; (setq pixel-scroll-precision-use-momentum t)     ;; enable inertial/momentum scrolling
+;; (setq pixel-scroll-precision-interpolation-factor 0.0001) ;; speed of scroll animation
+;; (setq pixel-scroll-precision-large-scroll-height 2)  ;; default is 100
+
+;; 0..100 (100 = opaque, 0 = fully transparent)
+;; (add-to-list 'default-frame-alist '(alpha . (90 . 90)))
+;; (add-to-list 'default-frame-alist '(alpha . (95 . 95)))
 
 (use-package which-key
   :init
@@ -245,7 +282,7 @@
 (use-package org
   :defer t
   :hook ((org-mode . olivetti-mode)
-	 (org-mode . variable-pitch-mode)
+	 ;; (org-mode . variable-pitc-mhode)
 	 (org-mode . visual-line-mode) ;; line wrap
 	 (org-mode . (lambda () (setq-local mode-line-format nil))) ;; no modeline
 	 )
@@ -258,6 +295,10 @@
   ;; Clean up source blocks
   (setq org-edit-src-content-indentation 0)
 
+  ;; Visually indent content under headings
+  (setq org-startup-indented t)
+  
+
   ;; Load code block execution support
   (org-babel-do-load-languages
    'org-babel-load-languages
@@ -266,6 +307,10 @@
   ;; Latex
   (setq org-startup-with-latex-preview t)
   (plist-put org-format-latex-options :scale 1.35)
+
+  ;; Make org subscripts defined with: _{}
+  (setq org-use-sub-superscripts '{})
+
  )
 
 ;; Org modern
@@ -278,6 +323,12 @@
   (setq org-modern-hide-stars nil)       ; shows original stars
   (setq org-modern-star '("◉" "○" "✸" "✿" "➤" "•"))
   (setq org-hide-leading-stars t))
+
+
+;; modern editor (gdocs, pagse) behavior 
+(use-package org-autolist
+  :ensure t
+  :hook (org-mode . org-autolist-mode))
 
 ;; Toc-org: table of contents
 (use-package toc-org
@@ -316,12 +367,19 @@
 ;; serpent (too long, not worth activating)
 ;; (add-to-list 'load-path "~/.emacs.d/language-support/serpent-mode.el")
 
+(setq-default indent-tabs-mode nil)  ;; always use spaces
+(setq-default tab-width 2)           ;; how wide to *show* any existing tabs
+(add-hook 'c-mode-common-hook
+          (lambda ()
+            (setq indent-tabs-mode nil  ; enforce spaces in C/C++
+                  c-basic-offset 2)))
+
 (use-package lsp-mode
   :ensure t
   :commands (lsp lsp-deferred)
   :hook ((python-mode . lsp-deferred)
          (c-mode . lsp-deferred)
-	 (c++-mode . lsp-deferred)
+	 ;; (c++-mode . lsp-deferred)
          (go-mode . lsp-deferred))
   :config
   (global-set-key [C-mouse-1] #'lsp-ui-peek-find-definitions)
@@ -360,7 +418,7 @@
   :config
   (global-unset-key (kbd "C-z"))
   (global-set-key (kbd "M-z")   'undo-fu-only-undo)
-  (global-set-key (kbd "M-S-z") 'undo-fu-only-redo))
+  (global-set-key (kbd "M-Z") 'undo-fu-only-redo))
 
 ;; apply copy/cut/delete to entire line
 (use-package whole-line-or-region
@@ -368,12 +426,12 @@
   :config
   (whole-line-or-region-global-mode))
 
-(use-package real-auto-save
+(use-package super-save
   :ensure t
-  :init
-  (setq real-auto-save-interval 1) ;; in seconds
   :config
-  (add-hook 'find-file-hook #'real-auto-save-mode)) ;; apply to any opened file
+  (setq super-save-auto-save-when-idle t
+        super-save-idle-duration 1) ;; save after 1s idle
+  (super-save-mode +1))
 
 (setq make-backup-files nil)  ;; Disable backup files like file~
 (setq auto-save-default nil)  ;; Disable auto-save files like #file#
