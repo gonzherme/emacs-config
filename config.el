@@ -62,6 +62,13 @@
   (find-file "~/.emacs.d/config.org")
 )
 
+;; gonz
+(defun gonz ()
+  (interactive)
+  ;; (delete-other-windows)
+  (dired "~/gonz/")
+)
+
 ;; cs
 (defun cs ()
   (interactive)
@@ -72,7 +79,6 @@
 (setq inhibit-startup-screen t)
 (setq initial-scratch-message nil)
 
-;; startup scratch buffer as org mode
 (setq initial-major-mode 'org-mode)
 
 (menu-bar-mode -1) ;; no menubar
@@ -105,10 +111,19 @@
 ;; custom themes
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
 
-;; current theme
-;; (load-theme 'doom-spacegrey t)
+;; Favorite themes
 ;; (load-theme 'doom-acario-light t)
-(load-theme 'doom-moonlight t)
+;; (load-theme 'doom-spacegrey t)
+;; (load-theme 'doom-city-lights t)
+;; (load-theme 'doom-moonlight t)
+
+;; Changing from light to dark depending on Mac OS system
+(use-package auto-dark
+  :ensure t
+  :config
+  ;; syntax:        '((dark-theme-name) (light-theme-name))
+  (setq auto-dark-themes '((doom-spacegrey) (doom-acario-light)))
+  (auto-dark-mode 1))
 
 ;; cursor width
 (setq-default cursor-type '(bar . 2))
@@ -127,11 +142,13 @@
 ;; remove/abbreviate minor-mode names in modeline
 (use-package diminish)
 
-(setq initial-frame-alist
-      '((width . 122)
-        (height . 36)
-        (top . 50)
-        (left . 110)))
+;; full screen
+(add-to-list 'default-frame-alist '(fullscreen . maximized))
+;; (setq initial-frame-alist
+;;       '((width . 122)
+;;         (height . 36)
+;;         (top . 50)
+;;         (left . 110)))
 
 (setq frame-resize-pixelwise t) ;; pixel precision in window movement
 
@@ -173,6 +190,7 @@
 ;; 0..100 (100 = opaque, 0 = fully transparent)
 ;; (add-to-list 'default-frame-alist '(alpha . (90 . 90)))
 ;; (add-to-list 'default-frame-alist '(alpha . (95 . 95)))
+;; (add-to-list 'default-frame-alist '(alpha . (98 . 98)))
 
 (use-package which-key
   :init
@@ -216,9 +234,9 @@
 
 (use-package ivy
   :custom
-  (setq ivy-use-virtual-buffers t)
-  (setq ivy-count-format "(%d/%d) ")
-  (setq enable-recursive-minibuffers t)
+  (ivy-use-virtual-buffers t)
+  (ivy-count-format "(%d/%d) ")
+  (enable-recursive-minibuffers t)
   :config
   (ivy-mode))
 
@@ -228,11 +246,11 @@
 
 (use-package ivy-rich
   :after ivy
-  :init (ivy-rich-mode 1) ;; this gets us descriptions in M-x
+  :init (ivy-rich-mode 1) ;; gets function descriptions in M-x
   :custom
-  (ivy-virtual-abbreviate 'full
-   ivy-rich-switch-buffer-align-virtual-buffer t
-   ivy-rich-path-style 'abbrev))
+  (ivy-virtual-abbreviate 'full)
+  (ivy-rich-switch-buffer-align-virtual-buffer t)
+  (ivy-rich-path-style 'abbrev))
 
 (use-package all-the-icons-ivy-rich
   :init (all-the-icons-ivy-rich-mode 1))
@@ -270,7 +288,8 @@
 (use-package grip-mode
   :ensure t
   ;; :commands (grip-mode grip-show-preview)
-  :hook (markdown-mode . grip-mode)
+  ;; :hook (markdown-mode . grip-mode)
+  ;; :hook (org-mode . grip-mode)
   :config
   ;; split vertically
   (setq split-width-threshold 0)
@@ -282,14 +301,13 @@
 (use-package org
   :defer t
   :hook ((org-mode . olivetti-mode)
-	 ;; (org-mode . variable-pitc-mhode)
+	 ;; (org-mode . variable-pitch-mode)
 	 (org-mode . visual-line-mode) ;; line wrap
 	 (org-mode . (lambda () (setq-local mode-line-format nil))) ;; no modeline
 	 )
   :config
   ;; Inline formatting
   (setq org-hide-emphasis-markers t)
-  (setq org-pretty-entities t)
   (setq org-startup-with-inline-images t)
 
   ;; Clean up source blocks
@@ -299,19 +317,17 @@
   (setq org-startup-indented t)
   
 
+  ;; #+title text 4x larger
+  (set-face-attribute 'org-document-title nil :height 2.0)
+  
   ;; Load code block execution support
   (org-babel-do-load-languages
    'org-babel-load-languages
    '((python . t)))
 
-  ;; Latex
-  (setq org-startup-with-latex-preview t)
-  (plist-put org-format-latex-options :scale 1.35)
-
   ;; Make org subscripts defined with: _{}
   (setq org-use-sub-superscripts '{})
-
- )
+)
 
 ;; Org modern
  (use-package org-modern
@@ -325,7 +341,7 @@
   (setq org-hide-leading-stars t))
 
 
-;; modern editor (gdocs, pagse) behavior 
+;; modern editor (gdocs, pages) behavior 
 (use-package org-autolist
   :ensure t
   :hook (org-mode . org-autolist-mode))
@@ -334,12 +350,28 @@
 (use-package toc-org
   :hook (org-mode . toc-org-enable))
 
+;; short keystrokes for org block autocomplete
+(use-package org
+  :config
+  (require 'org-tempo))
+
+;; Better previews (SVG) if available
+(setq org-preview-latex-default-process 'dvisvgm)
+;; Adjust size
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 1))
+;; Auto-preview LaTeX fragments when you open the file
+(setq org-startup-with-latex-preview t)
+
 (use-package auctex
   :hook
   (LaTeX-mode . turn-on-prettify-symbols-mode)
   (LaTeX-mode . reftex-mode)
   (LaTeX-mode . outline-minor-mode)
-  (LaTeX-mode . olivetti-mode))
+  (LaTeX-mode . olivetti-mode)
+  :config
+  (setq TeX-PDF-mode t) ;; always build PDFs
+  (setq TeX-engine 'xetex) ;; make the engine XeTeX
+  (setq TeX-command-default "LaTeX"))
 
 (setq reftex-toc-split-windows-horizontally t
 	  reftex-toc-split-windows-fraction     0.2)
@@ -348,19 +380,28 @@
 (use-package symbol-overlay
   :ensure t
   :hook (prog-mode . symbol-overlay-mode))
+
 ;; automatic closing parenthesis
 (electric-pair-mode 1)
+;; disable <> pairing
+(setq electric-pair-inhibit-predicate
+      (lambda (c)
+        (if (char-equal c ?<) t (electric-pair-default-inhibit c))))
 
 ;; line numbers
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 ;; olivetti
 (add-hook 'prog-mode-hook #'olivetti-mode)
-;; diff-hl (show git changess on buffer left side)
+;; diff-hl (show git changes on buffer left side)
 (use-package diff-hl
   :hook (prog-mode . diff-hl-mode))
 
 (add-to-list 'load-path "~/.emacs.d/language-support/") ;; ocaml, serpent-mode, why3
 (add-to-list 'auto-mode-alist '("\\.c0\\'" . c-mode)) ;; c0
+(add-to-list 'auto-mode-alist '("\\.pl\\'" . prolog-mode))
+;; terraform
+(use-package terraform-mode :ensure t)
+
 
 ;; why3 (not needed)
 ;; (require 'why3)
@@ -435,3 +476,21 @@
 
 (setq make-backup-files nil)  ;; Disable backup files like file~
 (setq auto-save-default nil)  ;; Disable auto-save files like #file#
+
+(use-package org-download
+  :ensure t
+  :after org
+  :defer nil ; Optional: ensures it loads immediately if you want to test right away
+  :custom
+  (org-download-method 'directory)
+  (org-download-image-dir "org-imgs")
+  (org-download-heading-lvl nil) ; this must be nil to stop folder creation
+  (org-download-timestamp-prefix-format nil) ; Optional: prevents timestamps in file names
+  (org-image-actual-width nil)
+  :config
+  (add-hook 'org-mode-hook 'org-download-enable) ;; enables in org mode
+  (add-hook 'dired-mode-hook 'org-download-enable) ;; enables in dired mode
+  
+  (setq org-download-annotate-function
+        (lambda (link)
+          "#+ATTR_ORG: :width 500\n")))
