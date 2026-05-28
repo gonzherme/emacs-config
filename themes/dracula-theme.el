@@ -105,7 +105,6 @@
 ;;; Code:
 (deftheme dracula)
 
-
 ;;;; Configuration options:
 
 (defgroup dracula nil
