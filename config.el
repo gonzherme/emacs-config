@@ -1,20 +1,28 @@
-(when (eq system-type 'darwin)
-  (let ((custom-paths '("/opt/homebrew/opt/coreutils/libexec/gnubin"   ;; 1. GNU Utilities (Highest Priority)
-                        "/opt/homebrew/bin"                            ;; 2. Apple Silicon Homebrew (gopls, fd)
-                        "/usr/local/bin")))                            ;; 3. Intel Mac Homebrew
+;; macOS GUI applications do not naturally inherit environment variables (like $PATH)
+;; from your terminal. This package forces Emacs to read your shell's profile
+;; so tools like node, python, and go work as expected.
+;; NOTE: This will add a slight delay to startup as it has to spin up an interactive shell.
+(use-package exec-path-from-shell
+  :config
+  (exec-path-from-shell-initialize))
 
-    ;; We loop through the list in reverse order
-    ;; Because we push each path to the *front* of Emacs's list,
-    ;; reversing ensures the GNU utilities end up at the very front!
-    (dolist (dir (reverse custom-paths))
-      (when (file-directory-p dir)
-        
-        ;; 1. Tell Emacs where to look for commands
-        (add-to-list 'exec-path dir)
-        
-        ;; 2. Tell the internal terminal where to look (if not already there)
-        (unless (string-match-p (regexp-quote dir) (getenv "PATH"))
-          (setenv "PATH" (concat dir ":" (getenv "PATH"))))))))
+
+;; Tell Emacs where to look for Homebrew binaries and GNU utilities on macOS
+(when (eq system-type 'darwin)
+  
+  ;; macOS defaults to older BSD utilities. If you installed GNU coreutils via Homebrew 
+  ;; (for tools like a modern `ls` or `gls`), Emacs needs to know where they live.
+  ;; We target the Apple Silicon specific Homebrew path.
+  (let ((gnu-path "/opt/homebrew/opt/coreutils/libexec/gnubin"))
+    
+    ;; Check if the directory actually exists so it doesn't throw errors on Intel Macs or Linux
+    (when (file-directory-p gnu-path)
+      
+      ;; 1. Update the internal terminal's $PATH so tools run inside Emacs find GNU utils first
+      (setenv "PATH" (concat gnu-path ":" (getenv "PATH")))
+      
+      ;; 2. Update Emacs's own command search path so it natively uses GNU utils over macOS defaults
+      (add-to-list 'exec-path gnu-path))))
 
 ;; Initialize package sources
 (require 'package)
@@ -22,8 +30,6 @@
 (setq package-archives '(("melpa" . "https://melpa.org/packages/")
                          ("org" . "https://orgmode.org/elpa/")
                          ("elpa" . "https://elpa.gnu.org/packages/")))
-
-(package-initialize)
 
 ;; LAZY-LOADING ENGINE
 ;; this prevents Emacs from checking or initializing packages on startup
@@ -49,6 +55,15 @@
            gcs-done))
 
 (add-hook 'emacs-startup-hook #'efs/display-startup-time)
+
+;; Make startup faster by reducing the frequency of garbage collection
+(setq gc-cons-threshold (* 100 1024 1024)
+      read-process-output-max (* 1024 1024))
+
+;; Reset GC to a reasonable normal value after startup
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 2 1024 1024))))
 
 (setq mac-command-modifier 'meta) ;; Cmd as M
 (global-set-key (kbd "M-c") 'kill-ring-save) ;; copy
@@ -140,8 +155,6 @@
           (lambda ()
             (with-current-buffer "*Letters*"
               (letters-setup-ascii-banner))))
-
-(setq initial-major-mode 'org-mode)
 
 (menu-bar-mode -1) ;; no menubar
 (tool-bar-mode -1) ;; no toolbars
@@ -241,8 +254,11 @@
   (add-hook 'auto-dark-dark-mode-hook #'my/set-titlebar-dark)
   (add-hook 'auto-dark-light-mode-hook #'my/set-titlebar-light)
 
-  ;; 5. Start auto-dark LAST so it triggers the hooks correctly on initialization
-  (auto-dark-mode 1))
+  ;; 5. Don't do (auto-dark-mode 1), because makes OS syscalls that take time, increase startup time
+  ;; can defer it for 1.5 seconds before starting it
+  (run-with-idle-timer 1.5 nil (lambda () (auto-dark-mode 1)))
+  (auto-dark-mode 1)
+)
 
 ;; cursor
 (setq-default cursor-type '(bar . 2))
@@ -457,6 +473,8 @@
   )
 
 (use-package corfu
+  ;; defer loading vertico until after startup (reduces startup time)
+  :hook (after-init . vertico-mode)
   :custom
   (corfu-auto t)                 ;; Enable auto completion
   (corfu-auto-delay 0.1)         ;; Very fast popup
@@ -467,8 +485,8 @@
 
 ;; [NEW] Vertico: Fast, minimalist vertical completions
 (use-package vertico
-  :init
-  (vertico-mode)
+  ;; defer loading vertico until after startup (reduces startup time)
+  :hook (after-init . vertico-mode)
   :custom
   (vertico-cycle t)) ;; Cycle through options at the bottom
 
@@ -501,8 +519,10 @@
 
 ;; [NEW] Marginalia: Adds beautiful descriptions/docs next to Vertico commands
 (use-package marginalia
-:init
-(marginalia-mode))
+  ;; defer loading vertico until after startup (reduces startup time)
+  :hook (after-init . vertico-mode)  
+  :init
+  (marginalia-mode))
 
 ;; [NEW] Orderless: improved file search, can type fragments of words separated by spaces
 (use-package orderless

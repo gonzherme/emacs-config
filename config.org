@@ -4,40 +4,50 @@
 * Emacs Version
 Prefer =emacs-plus= over vanilla =emacs= and =emacs-mac=. The feature I care most about is scrolling, and =emacs-plus= is much better than the other emacs versions at that (on MacOS).
 
-Installation:
+*Installation*
 #+begin_src shell
 brew tap d12frosted/emacs-plus
 brew install --cask emacs-plus-app
 #+end_src
-
 Further installation details in the [[https://github.com/d12frosted/homebrew-emacs-plus][official emacs-plus repository]]
 
+** Native Compilation
+=emacs-plus= comes by default with Native Compilation. If switch =emacs= version, make sure to download with native compilation
+
+Directly translates Emacs Lisp (Elisp) code into machine code
++ massive performance boost (2x to 5x)
++ smoother text rendering
++ much faster package execution (LSP integration)
++ everything will feel snappier, reducing UI stutter
++ faster startup time
+
 * System Paths & Binaries (macOS)
-By default, GUI Emacs on macOS doesn't inherit the terminal's =$PATH=. 
-
-The standard workaround is the =exec-path-from-shell= package, but it loads  an entire interactive shell on startup (including heavy themes, Oh My Zsh, etc), which delays Emacs booting by over a second. 
-
-To speed up the startup sequence, we bypass the shell entirely and manually tell Emacs where to find our Homebrew and GNU utilities. This connects Emacs 
-to tools like =gopls=, =fd=, and =coreutils= instantly.
-
 #+begin_src emacs-lisp
-(when (eq system-type 'darwin)
-  (let ((custom-paths '("/opt/homebrew/opt/coreutils/libexec/gnubin"   ;; 1. GNU Utilities (Highest Priority)
-                        "/opt/homebrew/bin"                            ;; 2. Apple Silicon Homebrew (gopls, fd)
-                        "/usr/local/bin")))                            ;; 3. Intel Mac Homebrew
+;; macOS GUI applications do not naturally inherit environment variables (like $PATH)
+;; from your terminal. This package forces Emacs to read your shell's profile
+;; so tools like node, python, and go work as expected.
+;; NOTE: This will add a slight delay to startup as it has to spin up an interactive shell.
+(use-package exec-path-from-shell
+  :config
+  (exec-path-from-shell-initialize))
 
-    ;; We loop through the list in reverse order
-    ;; Because we push each path to the *front* of Emacs's list,
-    ;; reversing ensures the GNU utilities end up at the very front!
-    (dolist (dir (reverse custom-paths))
-      (when (file-directory-p dir)
-        
-        ;; 1. Tell Emacs where to look for commands
-        (add-to-list 'exec-path dir)
-        
-        ;; 2. Tell the internal terminal where to look (if not already there)
-        (unless (string-match-p (regexp-quote dir) (getenv "PATH"))
-          (setenv "PATH" (concat dir ":" (getenv "PATH"))))))))
+
+;; Tell Emacs where to look for Homebrew binaries and GNU utilities on macOS
+(when (eq system-type 'darwin)
+  
+  ;; macOS defaults to older BSD utilities. If you installed GNU coreutils via Homebrew 
+  ;; (for tools like a modern `ls` or `gls`), Emacs needs to know where they live.
+  ;; We target the Apple Silicon specific Homebrew path.
+  (let ((gnu-path "/opt/homebrew/opt/coreutils/libexec/gnubin"))
+    
+    ;; Check if the directory actually exists so it doesn't throw errors on Intel Macs or Linux
+    (when (file-directory-p gnu-path)
+      
+      ;; 1. Update the internal terminal's $PATH so tools run inside Emacs find GNU utils first
+      (setenv "PATH" (concat gnu-path ":" (getenv "PATH")))
+      
+      ;; 2. Update Emacs's own command search path so it natively uses GNU utils over macOS defaults
+      (add-to-list 'exec-path gnu-path))))
 #+end_src
 
 * Package Management System
@@ -94,7 +104,6 @@ Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800
           (lambda ()
             (setq gc-cons-threshold (* 2 1024 1024))))
 #+end_src
-
 
 * Keybindings
 Apple-like
@@ -168,7 +177,6 @@ Quick file finding
 ** 1. Dashboard (idle)
 #+begin_src emacs-lisp
 ;; (use-package dashboard
-;;   :ensure t
 ;;   :after all-the-icons
 ;;   :config
 ;;   (require 'all-the-icons)
@@ -252,9 +260,8 @@ Initial source: [[https://github.com/wwxodus/Letters/blob/main/Letters.el][lette
 )
 
 ;; import github-emacs-theme
-;; (use-package github-dark-vscode-theme :ensure t)
+;; (use-package github-dark-vscode-theme)
 (use-package vscode-dark-plus-theme
-  :ensure t
   :config
   ;; Remove the border around the TODO word on org-mode files
   (setq vscode-dark-plus-box-org-todo nil)
@@ -424,7 +431,6 @@ Making image scrolling smooth
 Dims buffers not in use ([[https://github.com/hlissner/emacs-solaire-mode][source]])
 #+begin_src emacs-lisp
 (use-package solaire-mode
-  :ensure t
   :config
   (solaire-global-mode +1))
 #+end_src
@@ -432,7 +438,6 @@ Dims buffers not in use ([[https://github.com/hlissner/emacs-solaire-mode][sourc
 Olivetti
 #+begin_src emacs-lisp
 (use-package olivetti
-  :ensure t
   :hook ((text-mode . olivetti-mode)
          (prog-mode . olivetti-mode))
   :custom
@@ -509,7 +514,6 @@ Using tab-bar-mode
 Using centaur tabs -> tried it, but it just doesn't behave like standard tabs
 #+begin_src emacs-lisp
 ;; (use-package centaur-tabs
-;;   :ensure t
 ;;   :demand t
 ;;   :config
 ;;   ;; 1. Core Visuals
@@ -586,7 +590,7 @@ Corfu (new version of autocomplete)
 #+begin_src emacs-lisp
 (use-package corfu
   ;; defer loading vertico until after startup (reduces startup time)
-  :hook (after-init. vertico-mode)
+  :hook (after-init . vertico-mode)
   :custom
   (corfu-auto t)                 ;; Enable auto completion
   (corfu-auto-delay 0.1)         ;; Very fast popup
@@ -602,13 +606,12 @@ Modern Command Palette (Replacing Ivy/Counsel)
 ;; [NEW] Vertico: Fast, minimalist vertical completions
 (use-package vertico
   ;; defer loading vertico until after startup (reduces startup time)
-  :hook (after-init. vertico-mode)
+  :hook (after-init . vertico-mode)
   :custom
   (vertico-cycle t)) ;; Cycle through options at the bottom
 
 ;; [NEW] consult provides asynchronous search, live previews, and enhanced navigation commands
 (use-package consult
-  :ensure t
   :bind
   ;; C-c r to find recent files quickly
   (("C-c r" . consult-recent-file)
@@ -636,7 +639,7 @@ Modern Command Palette (Replacing Ivy/Counsel)
 ;; [NEW] Marginalia: Adds beautiful descriptions/docs next to Vertico commands
 (use-package marginalia
   ;; defer loading vertico until after startup (reduces startup time)
-  :hook (after-init. vertico-mode)  
+  :hook (after-init . vertico-mode)  
   :init
   (marginalia-mode))
 
@@ -662,7 +665,6 @@ Flycheck
 imenu
 #+begin_src emacs-lisp
 ;; (use-package imenu-list
-;;   :ensure t
 ;;   :bind (("M-i" . imenu-list-smart-toggle))
 ;;   ;; Hides centaur tabs only inside the imenu-list buffer
 ;;   :hook ((imenu-list-major-mode . centaur-tabs-local-mode)
@@ -974,7 +976,6 @@ Cmd + K to insert link
 Bold, Underline, Itallic -> will work for all markdown/text modes (not just org)
 #+begin_src emacs-lisp
 (use-package wrap-region
-  :ensure t
   :config
   ;; Enable wrap-region globally across all modes
   (wrap-region-global-mode 1)
@@ -994,7 +995,6 @@ Tiny tweaks
 ** Treemacs
 #+begin_src emacs-lisp
 (use-package treemacs
-  :ensure t
   :bind
   ("C-t" . treemacs)
   :hook
@@ -1013,9 +1013,7 @@ Tiny tweaks
   (treemacs-git-mode 'extended))
 
 ;; To get the specific VS Code style icons:
-(use-package treemacs-all-the-icons
-  :ensure t
-  :config
+(use-package treemacs-all-the-icons  :config
   (treemacs-load-theme "all-the-icons"))
 
 #+end_src
