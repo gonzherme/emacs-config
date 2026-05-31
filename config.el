@@ -1,3 +1,21 @@
+(when (eq system-type 'darwin)
+  (let ((custom-paths '("/opt/homebrew/opt/coreutils/libexec/gnubin"   ;; 1. GNU Utilities (Highest Priority)
+                        "/opt/homebrew/bin"                            ;; 2. Apple Silicon Homebrew (gopls, fd)
+                        "/usr/local/bin")))                            ;; 3. Intel Mac Homebrew
+
+    ;; We loop through the list in reverse order
+    ;; Because we push each path to the *front* of Emacs's list,
+    ;; reversing ensures the GNU utilities end up at the very front!
+    (dolist (dir (reverse custom-paths))
+      (when (file-directory-p dir)
+        
+        ;; 1. Tell Emacs where to look for commands
+        (add-to-list 'exec-path dir)
+        
+        ;; 2. Tell the internal terminal where to look (if not already there)
+        (unless (string-match-p (regexp-quote dir) (getenv "PATH"))
+          (setenv "PATH" (concat dir ":" (getenv "PATH"))))))))
+
 ;; Initialize package sources
 (require 'package)
 
@@ -22,6 +40,15 @@
   ;; Run the update check smoothly in the background post-startup (to reduce startup time)
   (run-with-idle-timer 5 nil #'auto-package-update-maybe)
   (auto-package-update-at-time "09:00"))
+
+(defun efs/display-startup-time ()
+  (message "Emacs loaded in %s with %d garbage collections."
+           (format "%.2f seconds"
+                   (float-time
+                   (time-subtract after-init-time before-init-time)))
+           gcs-done))
+
+(add-hook 'emacs-startup-hook #'efs/display-startup-time)
 
 (setq mac-command-modifier 'meta) ;; Cmd as M
 (global-set-key (kbd "M-c") 'kill-ring-save) ;; copy
@@ -105,8 +132,14 @@
 ;;                                   "~/gonz/goals/two-sigma.org")))
 
 (load-file "~/.emacs.d/letters.el")
-;; Set the entry buffer to use your polished Letters dashboard
-(setq initial-buffer-choice (lambda () (letters-setup-ascii-banner)))
+;; 1. Tell Emacs to open the buffer on startup, but leave it blank for a split second
+(setq initial-buffer-choice (lambda () (get-buffer-create "*Letters*")))
+
+;; 2. Draw the art exactly ONCE, after Treemacs has split the window (so calculates centering based on actual buffer size after treemacs is loaded)
+(add-hook 'window-setup-hook
+          (lambda ()
+            (with-current-buffer "*Letters*"
+              (letters-setup-ascii-banner))))
 
 (setq initial-major-mode 'org-mode)
 
@@ -146,7 +179,18 @@
 )
 
 ;; import github-emacs-theme
-(use-package github-dark-vscode-theme :ensure t)
+;; (use-package github-dark-vscode-theme :ensure t)
+(use-package vscode-dark-plus-theme
+  :ensure t
+  :config
+  ;; Remove the border around the TODO word on org-mode files
+  (setq vscode-dark-plus-box-org-todo nil)
+  ;; Do not set different heights for some org faces
+  (setq vscode-dark-plus-scale-org-faces nil)
+  ;; Avoid inverting hl-todo face
+  (setq vscode-dark-plus-invert-hl-todo nil)
+  ;; Configure current line highlighting style (works best with Emacs 28 or newer)
+  (setq vscode-dark-plus-render-line-highlight 'line))
 
 ;; import my custom themes
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
@@ -155,7 +199,7 @@
 (use-package auto-dark
   :config
   ;; 1. Set themes
-  (setq auto-dark-themes '((github-dark-vscode) (modus-operandi)))
+  (setq auto-dark-themes '((vscode-dark-plus) (modus-operandi)))
 
   ;; 2. Define visual tweaks that themes natively try to overwrite
   (defun my/apply-theme-tweaks ()
@@ -207,29 +251,31 @@
 
 ;; JetBrains Mono for code...
 (set-face-attribute 'default nil :font "JetBrains Mono" :height 160 :weight 'medium)
-;; Sans-Serif font for writing text/notes
-(set-face-attribute 'variable-pitch nil :font "SF Pro Display" :height 200 :weight 'medium)
+;; Apple notes font for text
+(set-face-attribute 'variable-pitch nil :font "SF Pro Text" :height 180 :weight 'normal)
 ;; Make bold be semi-bold, looks more modern
 (set-face-attribute 'bold nil :weight 'semi-bold)
 
-(use-package mood-line
-  :custom
-  ;; Use pretty Fira Code-compatible glyphs
-  (mood-line-glyph-alist mood-line-glyphs-fira-code)
-  :config
-  (mood-line-mode) ;; enable mood-line
+(setq-default mode-line-format nil)
 
-  (setq mood-line-format
-        (mood-line-defformat
-         :left
-         (((mood-line-segment-buffer-status) . " ")
-          ((mood-line-segment-buffer-name)   . " : ")
-          (mood-line-segment-major-mode))
-         :right
-         (((mood-line-segment-scroll)             . " ")
-          ((mood-line-segment-cursor-position)    . "  ")
-          ((when (mood-line-segment-checker) "|") . "  ")
-          ((mood-line-segment-checker)            . "  ")))))
+;; (use-package mood-line
+;;   :custom
+;;   ;; Use pretty Fira Code-compatible glyphs
+;;   (mood-line-glyph-alist mood-line-glyphs-fira-code)
+;;   :config
+;;   (mood-line-mode) ;; enable mood-line
+
+;;   (setq mood-line-format
+;;         (mood-line-defformat
+;;          :left
+;;          (((mood-line-segment-buffer-status) . " ")
+;;           ((mood-line-segment-buffer-name)   . " : ")
+;;           (mood-line-segment-major-mode))
+;;          :right
+;;          (((mood-line-segment-scroll)             . " ")
+;;           ((mood-line-segment-cursor-position)    . "  ")
+;;           ((when (mood-line-segment-checker) "|") . "  ")
+;;           ((mood-line-segment-checker)            . "  ")))))
 
 ;; Disable native macOS fullscreen virtual spaces transition
 (setq ns-use-native-fullscreen nil)
@@ -267,6 +313,35 @@
   ;; -- Elfeed Configuration (Optional) --
   ;; Advice `elfeed-show-entry` to trigger `image-slicing-mode`
   (advice-add #'elfeed-show-entry :after #'image-slicing-mode))
+
+(use-package solaire-mode
+  :ensure t
+  :config
+  (solaire-global-mode +1))
+
+(use-package olivetti
+  :ensure t
+  :hook ((text-mode . olivetti-mode)
+         (prog-mode . olivetti-mode))
+  :custom
+  ;; A float forces a strict window percentaged
+  (olivetti-body-width 0.85)
+  :config
+  ;; remove ugly fringes
+  (fringe-mode 0)
+)
+
+;; make divider color match theme color
+(set-face-background 'window-divider
+                     (face-background 'mode-line-inactive))
+;; 't' means both bottom and right
+(setq window-divider-default-places t)
+;; Thickness of horizontal line in pixels
+(setq window-divider-default-bottom-width 1)
+;; Thickness of vertical line in pixels
+(setq window-divider-default-right-width 1)
+;; Turn the mode on
+(window-divider-mode 1)
 
 ;; 1. Enable built-in workspace tabs
 (tab-bar-mode 1)
@@ -398,27 +473,42 @@
   (vertico-cycle t)) ;; Cycle through options at the bottom
 
 ;; [NEW] consult provides asynchronous search, live previews, and enhanced navigation commands
-;; (use-package consult
-;;   :ensure t
-;;   :bind
-;;   ;; C-c r to find recent files quickly
-;;   (("C-c r" . consult-recent-file)
-;;    ;; Replace default search with Consult's powerful ripgrep integration
-;;    ("C-s" . consult-line)) 
-;;   :init
-;;   ;; Enhances your existing Vertico completion
-;;   (setq completion-in-region-function #'consult-completion-in-region))
+(use-package consult
+  :ensure t
+  :bind
+  ;; C-c r to find recent files quickly
+  (("C-c r" . consult-recent-file)
+  ;; Replace default search with Consult's powerful ripgrep integration
+  ("C-s" . consult-line)) 
+  ;; Spotlight-like file search
+  (("C-x f" . my/spotlight-gonz))
+  :config
+  (defun my/spotlight-gonz ()
+    "Spotlight-like recursive search for files inside ~/gonz/"
+    (interactive)
+    (let* ((default-directory "~/gonz/")
+           ;; 'fd' searches for files and directories
+           (paths (split-string (shell-command-to-string "fd --hidden --exclude .git .") "\n" t))
+           (choice (completing-read "Rec Find (~/gonz/): " paths)))
+      (when choice
+        (find-file (expand-file-name choice "~/gonz/")))))
+  :init
+  ;; Enhances your existing Vertico completion
+  (setq completion-in-region-function #'consult-completion-in-region))
+
+;; no more searching backwards, rely on consult
+(keymap-unset global-map "C-r")
 
 ;; [NEW] Marginalia: Adds beautiful descriptions/docs next to Vertico commands
 (use-package marginalia
 :init
 (marginalia-mode))
 
-;; [NEW] Orderless: The magic that lets you search by typing fragments of words separated by spaces
+;; [NEW] Orderless: improved file search, can type fragments of words separated by spaces
 (use-package orderless
-:custom
-(completion-styles '(orderless basic))
-(completion-category-overrides '((file (styles basic partial-completion)))))
+  :custom
+  (completion-styles '(orderless basic))
+  (completion-category-overrides '((file (styles basic partial-completion)))))
 
 (use-package flycheck
   :defer t
@@ -453,8 +543,6 @@
   :bind (:map magit-mode-map
               ("C-M-f" . magit-section-forward)
               ("C-M-b" . magit-section-backward))
-  :bind (:map custom-bindings-map
-              ("M-g b" . magit-blame-addition))
   :hook
   ((magit-pre-refresh  . diff-hl-magit-pre-refresh)
    (magit-post-refresh . diff-hl-magit-post-refresh))
@@ -475,11 +563,14 @@
   :hook
   (org-mode . visual-line-mode) ;; line wrap
   (org-mode . org-indent-mode)  ;; <--- FORCE INDENTATION ON
-  (org-mode . (lambda () (setq-local mode-line-format nil))) ;; no modeline
   :config
   ;; Inline formatting
   (setq org-hide-emphasis-markers t)
   (setq org-startup-with-inline-images t)
+
+  ;; short keystrokes for org block autocomplete
+  ;; e.g. <s -> source block
+  (require 'org-tempo) 
 
   ;; Clean up source blocks
   (setq org-edit-src-content-indentation 0)
@@ -518,22 +609,18 @@
   
   ;; Clean Apple-style bullet points for standard lists (- or + or *)
   (setq org-modern-list 
-        '((43 . "◦")     ; Plus sign becomes a hollow dot
-          (45 . "•")))   ; Minus sign becomes a solid dot
+        '((43 . "•")) ; plus sign becomes a solid dot
   )
 
-;; modern editor (gdocs, pages) behavior 
+;; makes bulleted and numbered lists behave like modern editor (gdocs, pages)
+;; (renumbering, automatic new bullet when press enter, delete when press enter, ...)
 (use-package org-autolist
   :hook (org-mode . org-autolist-mode))
 
 ;; Toc-org: table of contents
 (use-package toc-org
   :hook (org-mode . toc-org-enable))
- 
-;; short keystrokes for org block autocomplete
-(use-package org
-  :config
-  (require 'org-tempo))
+)
 
 ;; Better previews (SVG) if available
 (setq org-preview-latex-default-process 'dvisvgm)
@@ -558,7 +645,7 @@
   (LaTeX-mode . turn-on-prettify-symbols-mode)
   (LaTeX-mode . reftex-mode)
   (LaTeX-mode . outline-minor-mode)
-  (LaTeX-mode . olivetti-mode)
+  ;; (LaTeX-mode . olivetti-mode)
   :config
   (setq TeX-PDF-mode t) ;; always build PDFs
   (setq TeX-engine 'xetex) ;; make the engine XeTeX
@@ -629,13 +716,11 @@
         lsp-ui-doc-show-with-cursor nil ;; don't show popup if (text) cursor is on word
         lsp-ui-doc-show-with-mouse t)) ;; shows variable/function info when mouse hovers over
 
-;; Installed with npm install -g pyright
+;; 1. PYRIGHT (installed with npm install -g pyright)
 (use-package lsp-pyright
   :hook (python-mode . (lambda () (require 'lsp-pyright) (lsp))))
 
-(use-package exec-path-from-shell
-  :config
-  (exec-path-from-shell-initialize))
+;; 2. Gopls (go server, installed via homebrew)
 
 (delete-selection-mode 1)    ;; typing on selected text deletes it
 (save-place-mode 1)          ;; remember cursor location in files after closing
@@ -681,8 +766,44 @@
 (with-eval-after-load 'org
   (define-key org-mode-map (kbd "M-k") #'org-insert-link))
 
+(use-package wrap-region
+  :ensure t
+  :config
+  ;; Enable wrap-region globally across all modes
+  (wrap-region-global-mode 1)
+  
+  ;; Define the global wrappers and their shortcut keys
+  ;; Syntax: (wrap-region-add-wrapper "left" "right" "trigger-key")
+  (wrap-region-add-wrapper "/" "/" "M-i")
+  (wrap-region-add-wrapper "_" "_" "M-u"))
+
 ;; when C-c C-f, start already by "~/gonz/" instead of "~/"
 (setq default-directory "~/gonz/")
+
+(use-package treemacs
+  :ensure t
+  :bind
+  ("C-t" . treemacs)
+  :hook
+  (emacs-startup . treemacs)
+  :config
+  ;; treemacs follows whichever buffer you're on
+  (treemacs-follow-mode t)
+  ;; treemacs follows and sets the correct project root
+  (treemacs-project-follow-mode t)
+  ;; make tree font 85% the size of main buffer font
+  (set-face-attribute 'treemacs-root-face nil :height 0.85)
+  (set-face-attribute 'treemacs-directory-face nil :height 0.85)
+  (set-face-attribute 'treemacs-file-face nil :height 0.85)
+  (set-face-attribute 'treemacs-tags-face nil :height 0.85)
+  ;; explained here: https://github.com/Alexander-Miller/treemacs#git-mode
+  (treemacs-git-mode 'extended))
+
+;; To get the specific VS Code style icons:
+(use-package treemacs-all-the-icons
+  :ensure t
+  :config
+  (treemacs-load-theme "all-the-icons"))
 
 ;; Tell Emacs where to look for Homebrew binaries and GNU utilities on macOS
 (when (eq system-type 'darwin)
@@ -695,27 +816,16 @@
 (use-package dirvish
   :init
   ;; Open dirvish instead of default dired globally
-  (dirvish-override-dired-mode)
-  
+  (dirvish-override-dired-mode)  
   :custom
   ;; Display file icons using all-the-icons
   ;; Adding 'subtree-state' enables built-in VSCode-style folder expansion
-  (dirvish-attributes '(all-the-icons file-size subtree-state collapse))
-
-  :bind
-  (("M-r" . dirvish-side))
-  
+  (dirvish-attributes '(all-the-icons file-size subtree-state collapse))  
   :config
   ;; Enable live preview of images, PDFs, and code files as you scroll
   (dirvish-peek-mode)
   ;; Make the sidebar automatically follow the currently active buffer
   (dirvish-side-follow-mode 1)
-  
-  ;; Dirvish Side Window settings
-  ;; (setq dirvish-side-width 30
-  ;;       dirvish-side-auto-close t) ;; Closes the side panel when you open a file
-  (setq dirvish-header-line-height 25
-        dirvish-header-line-format '(:left (path) :right (free-space)))
   
   ;; 3. No Text Wrapping: Truncate lines in Dirvish/Dired
   (add-hook 'dired-mode-hook (lambda () (setq truncate-lines t)))
@@ -729,7 +839,7 @@
          ("y"   . dirvish-yank-menu)        ;; Advanced copy/paste/move engine
          
          ;; 1. Search current directory and subdirectories (requires 'fd' installed)
-         ("f"   . dirvish-fd)               
+         ("f"   . dirvish-fd)              
          
          ;; --- Essential Recommended Shortcuts ---
          ("TAB" . dirvish-subtree-toggle)   ;; Expand/collapse directory trees in place

@@ -265,7 +265,7 @@ Transparency
 # Assist Tools
 
 Which-key (suggests commands)
-
+p
     (use-package which-key
       :init
         (which-key-mode 1)

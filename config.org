@@ -12,6 +12,34 @@ brew install --cask emacs-plus-app
 
 Further installation details in the [[https://github.com/d12frosted/homebrew-emacs-plus][official emacs-plus repository]]
 
+* System Paths & Binaries (macOS)
+By default, GUI Emacs on macOS doesn't inherit the terminal's =$PATH=. 
+
+The standard workaround is the =exec-path-from-shell= package, but it loads  an entire interactive shell on startup (including heavy themes, Oh My Zsh, etc), which delays Emacs booting by over a second. 
+
+To speed up the startup sequence, we bypass the shell entirely and manually tell Emacs where to find our Homebrew and GNU utilities. This connects Emacs 
+to tools like =gopls=, =fd=, and =coreutils= instantly.
+
+#+begin_src emacs-lisp
+(when (eq system-type 'darwin)
+  (let ((custom-paths '("/opt/homebrew/opt/coreutils/libexec/gnubin"   ;; 1. GNU Utilities (Highest Priority)
+                        "/opt/homebrew/bin"                            ;; 2. Apple Silicon Homebrew (gopls, fd)
+                        "/usr/local/bin")))                            ;; 3. Intel Mac Homebrew
+
+    ;; We loop through the list in reverse order
+    ;; Because we push each path to the *front* of Emacs's list,
+    ;; reversing ensures the GNU utilities end up at the very front!
+    (dolist (dir (reverse custom-paths))
+      (when (file-directory-p dir)
+        
+        ;; 1. Tell Emacs where to look for commands
+        (add-to-list 'exec-path dir)
+        
+        ;; 2. Tell the internal terminal where to look (if not already there)
+        (unless (string-match-p (regexp-quote dir) (getenv "PATH"))
+          (setenv "PATH" (concat dir ":" (getenv "PATH"))))))))
+#+end_src
+
 * Package Management System
 Set package sources
 #+begin_src emacs-lisp
@@ -21,8 +49,6 @@ Set package sources
 (setq package-archives '(("melpa" . "https://melpa.org/packages/")
                          ("org" . "https://orgmode.org/elpa/")
                          ("elpa" . "https://elpa.gnu.org/packages/")))
-
-(package-initialize)
 
 ;; LAZY-LOADING ENGINE
 ;; this prevents Emacs from checking or initializing packages on startup
@@ -43,6 +69,32 @@ Update packages every 60 days
   (run-with-idle-timer 5 nil #'auto-package-update-maybe)
   (auto-package-update-at-time "09:00"))
 #+end_src
+
+* Startup Speed
+Function to print out the duration of Emacs startup:
+#+begin_src emacs-lisp
+(defun efs/display-startup-time ()
+  (message "Emacs loaded in %s with %d garbage collections."
+           (format "%.2f seconds"
+                   (float-time
+                   (time-subtract after-init-time before-init-time)))
+           gcs-done))
+
+(add-hook 'emacs-startup-hook #'efs/display-startup-time)
+#+end_src
+
+Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800KB). Because loading packages generates a lot of garbage, Emacs will pause hundreds of times during startup just to clean up memory.
+#+begin_src emacs-lisp
+;; Make startup faster by reducing the frequency of garbage collection
+(setq gc-cons-threshold (* 100 1024 1024)
+      read-process-output-max (* 1024 1024))
+
+;; Reset GC to a reasonable normal value after startup
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 2 1024 1024))))
+#+end_src
+
 
 * Keybindings
 Apple-like
@@ -149,13 +201,14 @@ Quick file finding
 Initial source: [[https://github.com/wwxodus/Letters/blob/main/Letters.el][letters.el]], made several changes
 #+begin_src emacs-lisp
 (load-file "~/.emacs.d/letters.el")
-;; Set the entry buffer to use your polished Letters dashboard
-(setq initial-buffer-choice (lambda () (letters-setup-ascii-banner)))
-#+end_src
-* Scratch Buffers
-Set mode of all scratch buffers to org-moe
-#+begin_src emacs-lisp
-(setq initial-major-mode 'org-mode)
+;; 1. Tell Emacs to open the buffer on startup, but leave it blank for a split second
+(setq initial-buffer-choice (lambda () (get-buffer-create "*Letters*")))
+
+;; 2. Draw the art exactly ONCE, after Treemacs has split the window (so calculates centering based on actual buffer size after treemacs is loaded)
+(add-hook 'window-setup-hook
+          (lambda ()
+            (with-current-buffer "*Letters*"
+              (letters-setup-ascii-banner))))
 #+end_src
 * Visuals
 ** No clutter
@@ -199,7 +252,18 @@ Set mode of all scratch buffers to org-moe
 )
 
 ;; import github-emacs-theme
-(use-package github-dark-vscode-theme :ensure t)
+;; (use-package github-dark-vscode-theme :ensure t)
+(use-package vscode-dark-plus-theme
+  :ensure t
+  :config
+  ;; Remove the border around the TODO word on org-mode files
+  (setq vscode-dark-plus-box-org-todo nil)
+  ;; Do not set different heights for some org faces
+  (setq vscode-dark-plus-scale-org-faces nil)
+  ;; Avoid inverting hl-todo face
+  (setq vscode-dark-plus-invert-hl-todo nil)
+  ;; Configure current line highlighting style (works best with Emacs 28 or newer)
+  (setq vscode-dark-plus-render-line-highlight 'line))
 
 ;; import my custom themes
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
@@ -208,7 +272,7 @@ Set mode of all scratch buffers to org-moe
 (use-package auto-dark
   :config
   ;; 1. Set themes
-  (setq auto-dark-themes '((github-dark-vscode) (modus-operandi)))
+  (setq auto-dark-themes '((vscode-dark-plus) (modus-operandi)))
 
   ;; 2. Define visual tweaks that themes natively try to overwrite
   (defun my/apply-theme-tweaks ()
@@ -250,8 +314,11 @@ Set mode of all scratch buffers to org-moe
   (add-hook 'auto-dark-dark-mode-hook #'my/set-titlebar-dark)
   (add-hook 'auto-dark-light-mode-hook #'my/set-titlebar-light)
 
-  ;; 5. Start auto-dark LAST so it triggers the hooks correctly on initialization
-  (auto-dark-mode 1))
+  ;; 5. Don't do (auto-dark-mode 1), because makes OS syscalls that take time, increase startup time
+  ;; can defer it for 1.5 seconds before starting it
+  (run-with-idle-timer 1.5 nil (lambda () (auto-dark-mode 1)))
+  (auto-dark-mode 1)
+)
 #+end_src
 
 ** Cursor
@@ -263,35 +330,42 @@ Set mode of all scratch buffers to org-moe
 #+end_src
 
 ** Font
+Testing out some shi
 #+begin_src emacs-lisp
 ;; JetBrains Mono for code...
 (set-face-attribute 'default nil :font "JetBrains Mono" :height 160 :weight 'medium)
-;; Sans-Serif font for writing text/notes
-(set-face-attribute 'variable-pitch nil :font "SF Pro Display" :height 200 :weight 'medium)
+;; Apple notes font for text
+(set-face-attribute 'variable-pitch nil :font "SF Pro Text" :height 180 :weight 'normal)
 ;; Make bold be semi-bold, looks more modern
 (set-face-attribute 'bold nil :weight 'semi-bold)
 #+end_src
 
 ** Modeline
+If want to globally hide modeline:
 #+begin_src emacs-lisp
-(use-package mood-line
-  :custom
-  ;; Use pretty Fira Code-compatible glyphs
-  (mood-line-glyph-alist mood-line-glyphs-fira-code)
-  :config
-  (mood-line-mode) ;; enable mood-line
+(setq-default mode-line-format nil)
+#+end_src
 
-  (setq mood-line-format
-        (mood-line-defformat
-         :left
-         (((mood-line-segment-buffer-status) . " ")
-          ((mood-line-segment-buffer-name)   . " : ")
-          (mood-line-segment-major-mode))
-         :right
-         (((mood-line-segment-scroll)             . " ")
-          ((mood-line-segment-cursor-position)    . "  ")
-          ((when (mood-line-segment-checker) "|") . "  ")
-          ((mood-line-segment-checker)            . "  ")))))
+If want to activate modeline:
+#+begin_src emacs-lisp
+;; (use-package mood-line
+;;   :custom
+;;   ;; Use pretty Fira Code-compatible glyphs
+;;   (mood-line-glyph-alist mood-line-glyphs-fira-code)
+;;   :config
+;;   (mood-line-mode) ;; enable mood-line
+
+;;   (setq mood-line-format
+;;         (mood-line-defformat
+;;          :left
+;;          (((mood-line-segment-buffer-status) . " ")
+;;           ((mood-line-segment-buffer-name)   . " : ")
+;;           (mood-line-segment-major-mode))
+;;          :right
+;;          (((mood-line-segment-scroll)             . " ")
+;;           ((mood-line-segment-cursor-position)    . "  ")
+;;           ((when (mood-line-segment-checker) "|") . "  ")
+;;           ((mood-line-segment-checker)            . "  ")))))
 #+end_src
 
 ** Window size
@@ -345,6 +419,44 @@ Making image scrolling smooth
   ;; -- Elfeed Configuration (Optional) --
   ;; Advice `elfeed-show-entry` to trigger `image-slicing-mode`
   (advice-add #'elfeed-show-entry :after #'image-slicing-mode))
+#+end_src
+** Solaire mode
+Dims buffers not in use ([[https://github.com/hlissner/emacs-solaire-mode][source]])
+#+begin_src emacs-lisp
+(use-package solaire-mode
+  :ensure t
+  :config
+  (solaire-global-mode +1))
+#+end_src
+** Text Centering
+Olivetti
+#+begin_src emacs-lisp
+(use-package olivetti
+  :ensure t
+  :hook ((text-mode . olivetti-mode)
+         (prog-mode . olivetti-mode))
+  :custom
+  ;; A float forces a strict window percentaged
+  (olivetti-body-width 0.85)
+  :config
+  ;; remove ugly fringes
+  (fringe-mode 0)
+)
+#+end_src
+** Window Dividers
+Enable thin borders for both vertical and horizontal window splits
+#+begin_src emacs-lisp
+;; make divider color match theme color
+(set-face-background 'window-divider
+                     (face-background 'mode-line-inactive))
+;; 't' means both bottom and right
+(setq window-divider-default-places t)
+;; Thickness of horizontal line in pixels
+(setq window-divider-default-bottom-width 1)
+;; Thickness of vertical line in pixels
+(setq window-divider-default-right-width 1)
+;; Turn the mode on
+(window-divider-mode 1)
 #+end_src
 * Tabs
 Using tab-bar-mode
@@ -473,6 +585,8 @@ Which-key (suggests commands)
 Corfu (new version of autocomplete)
 #+begin_src emacs-lisp
 (use-package corfu
+  ;; defer loading vertico until after startup (reduces startup time)
+  :hook (after-init. vertico-mode)
   :custom
   (corfu-auto t)                 ;; Enable auto completion
   (corfu-auto-delay 0.1)         ;; Very fast popup
@@ -487,33 +601,50 @@ Modern Command Palette (Replacing Ivy/Counsel)
 #+begin_src emacs-lisp
 ;; [NEW] Vertico: Fast, minimalist vertical completions
 (use-package vertico
-  :init
-  (vertico-mode)
+  ;; defer loading vertico until after startup (reduces startup time)
+  :hook (after-init. vertico-mode)
   :custom
   (vertico-cycle t)) ;; Cycle through options at the bottom
 
 ;; [NEW] consult provides asynchronous search, live previews, and enhanced navigation commands
-;; (use-package consult
-;;   :ensure t
-;;   :bind
-;;   ;; C-c r to find recent files quickly
-;;   (("C-c r" . consult-recent-file)
-;;    ;; Replace default search with Consult's powerful ripgrep integration
-;;    ("C-s" . consult-line)) 
-;;   :init
-;;   ;; Enhances your existing Vertico completion
-;;   (setq completion-in-region-function #'consult-completion-in-region))
+(use-package consult
+  :ensure t
+  :bind
+  ;; C-c r to find recent files quickly
+  (("C-c r" . consult-recent-file)
+  ;; Replace default search with Consult's powerful ripgrep integration
+  ("C-s" . consult-line)) 
+  ;; Spotlight-like file search
+  (("C-x f" . my/spotlight-gonz))
+  :config
+  (defun my/spotlight-gonz ()
+    "Spotlight-like recursive search for files inside ~/gonz/"
+    (interactive)
+    (let* ((default-directory "~/gonz/")
+           ;; 'fd' searches for files and directories
+           (paths (split-string (shell-command-to-string "fd --hidden --exclude .git .") "\n" t))
+           (choice (completing-read "Rec Find (~/gonz/): " paths)))
+      (when choice
+        (find-file (expand-file-name choice "~/gonz/")))))
+  :init
+  ;; Enhances your existing Vertico completion
+  (setq completion-in-region-function #'consult-completion-in-region))
+
+;; no more searching backwards, rely on consult
+(keymap-unset global-map "C-r")
 
 ;; [NEW] Marginalia: Adds beautiful descriptions/docs next to Vertico commands
 (use-package marginalia
-:init
-(marginalia-mode))
+  ;; defer loading vertico until after startup (reduces startup time)
+  :hook (after-init. vertico-mode)  
+  :init
+  (marginalia-mode))
 
-;; [NEW] Orderless: The magic that lets you search by typing fragments of words separated by spaces
+;; [NEW] Orderless: improved file search, can type fragments of words separated by spaces
 (use-package orderless
-:custom
-(completion-styles '(orderless basic))
-(completion-category-overrides '((file (styles basic partial-completion)))))
+  :custom
+  (completion-styles '(orderless basic))
+  (completion-category-overrides '((file (styles basic partial-completion)))))
 #+end_src
 
 Flycheck
@@ -557,8 +688,6 @@ Magit
   :bind (:map magit-mode-map
               ("C-M-f" . magit-section-forward)
               ("C-M-b" . magit-section-backward))
-  :bind (:map custom-bindings-map
-              ("M-g b" . magit-blame-addition))
   :hook
   ((magit-pre-refresh  . diff-hl-magit-pre-refresh)
    (magit-post-refresh . diff-hl-magit-post-refresh))
@@ -589,11 +718,14 @@ Markdown mode
   :hook
   (org-mode . visual-line-mode) ;; line wrap
   (org-mode . org-indent-mode)  ;; <--- FORCE INDENTATION ON
-  (org-mode . (lambda () (setq-local mode-line-format nil))) ;; no modeline
   :config
   ;; Inline formatting
   (setq org-hide-emphasis-markers t)
   (setq org-startup-with-inline-images t)
+
+  ;; short keystrokes for org block autocomplete
+  ;; e.g. <s -> source block
+  (require 'org-tempo) 
 
   ;; Clean up source blocks
   (setq org-edit-src-content-indentation 0)
@@ -632,22 +764,18 @@ Markdown mode
   
   ;; Clean Apple-style bullet points for standard lists (- or + or *)
   (setq org-modern-list 
-        '((43 . "◦")     ; Plus sign becomes a hollow dot
-          (45 . "•")))   ; Minus sign becomes a solid dot
+        '((43 . "•")) ; plus sign becomes a solid dot
   )
 
-;; modern editor (gdocs, pages) behavior 
+;; makes bulleted and numbered lists behave like modern editor (gdocs, pages)
+;; (renumbering, automatic new bullet when press enter, delete when press enter, ...)
 (use-package org-autolist
   :hook (org-mode . org-autolist-mode))
 
 ;; Toc-org: table of contents
 (use-package toc-org
   :hook (org-mode . toc-org-enable))
- 
-;; short keystrokes for org block autocomplete
-(use-package org
-  :config
-  (require 'org-tempo))
+)
 #+end_src
 
 Redering latex in org-mode
@@ -683,7 +811,7 @@ Auctex
   (LaTeX-mode . turn-on-prettify-symbols-mode)
   (LaTeX-mode . reftex-mode)
   (LaTeX-mode . outline-minor-mode)
-  (LaTeX-mode . olivetti-mode)
+  ;; (LaTeX-mode . olivetti-mode)
   :config
   (setq TeX-PDF-mode t) ;; always build PDFs
   (setq TeX-engine 'xetex) ;; make the engine XeTeX
@@ -775,18 +903,12 @@ Indenting
 #+end_src
 
 ** LSP Servers
-Pyright
 #+begin_src emacs-lisp
-;; Installed with npm install -g pyright
+;; 1. PYRIGHT (installed with npm install -g pyright)
 (use-package lsp-pyright
   :hook (python-mode . (lambda () (require 'lsp-pyright) (lsp))))
-#+end_src
 
-Gopls (go server, installed via homebrew)
-#+begin_src emacs-lisp
-(use-package exec-path-from-shell
-  :config
-  (exec-path-from-shell-initialize))
+;; 2. Gopls (go server, installed via homebrew)
 #+end_src
 
 * Modernize Text Editing
@@ -849,13 +971,54 @@ Cmd + K to insert link
   (define-key org-mode-map (kbd "M-k") #'org-insert-link))
 #+end_src
 
+Bold, Underline, Itallic -> will work for all markdown/text modes (not just org)
+#+begin_src emacs-lisp
+(use-package wrap-region
+  :ensure t
+  :config
+  ;; Enable wrap-region globally across all modes
+  (wrap-region-global-mode 1)
+  
+  ;; Define the global wrappers and their shortcut keys
+  ;; Syntax: (wrap-region-add-wrapper "left" "right" "trigger-key")
+  (wrap-region-add-wrapper "/" "/" "M-i")
+  (wrap-region-add-wrapper "_" "_" "M-u"))
+#+end_src
+
 * File Management
 Tiny tweaks
 #+begin_src emacs-lisp
 ;; when C-c C-f, start already by "~/gonz/" instead of "~/"
 (setq default-directory "~/gonz/")
 #+end_src
+** Treemacs
+#+begin_src emacs-lisp
+(use-package treemacs
+  :ensure t
+  :bind
+  ("C-t" . treemacs)
+  :hook
+  (emacs-startup . treemacs)
+  :config
+  ;; treemacs follows whichever buffer you're on
+  (treemacs-follow-mode t)
+  ;; treemacs follows and sets the correct project root
+  (treemacs-project-follow-mode t)
+  ;; make tree font 85% the size of main buffer font
+  (set-face-attribute 'treemacs-root-face nil :height 0.85)
+  (set-face-attribute 'treemacs-directory-face nil :height 0.85)
+  (set-face-attribute 'treemacs-file-face nil :height 0.85)
+  (set-face-attribute 'treemacs-tags-face nil :height 0.85)
+  ;; explained here: https://github.com/Alexander-Miller/treemacs#git-mode
+  (treemacs-git-mode 'extended))
 
+;; To get the specific VS Code style icons:
+(use-package treemacs-all-the-icons
+  :ensure t
+  :config
+  (treemacs-load-theme "all-the-icons"))
+
+#+end_src
 ** Dirvish
 Two command line tools must be installed:
 1. coreutils (=brew install coreutils)=
@@ -878,27 +1041,16 @@ Modernizes Emacs' dired: column-based,  file previews
 (use-package dirvish
   :init
   ;; Open dirvish instead of default dired globally
-  (dirvish-override-dired-mode)
-  
+  (dirvish-override-dired-mode)  
   :custom
   ;; Display file icons using all-the-icons
   ;; Adding 'subtree-state' enables built-in VSCode-style folder expansion
-  (dirvish-attributes '(all-the-icons file-size subtree-state collapse))
-
-  :bind
-  (("C-t" . dirvish-side))
-  
+  (dirvish-attributes '(all-the-icons file-size subtree-state collapse))  
   :config
   ;; Enable live preview of images, PDFs, and code files as you scroll
   (dirvish-peek-mode)
   ;; Make the sidebar automatically follow the currently active buffer
   (dirvish-side-follow-mode 1)
-  
-  ;; Dirvish Side Window settings
-  ;; (setq dirvish-side-width 30
-  ;;       dirvish-side-auto-close t) ;; Closes the side panel when you open a file
-  (setq dirvish-header-line-height 25
-        dirvish-header-line-format '(:left (path) :right (free-space)))
   
   ;; 3. No Text Wrapping: Truncate lines in Dirvish/Dired
   (add-hook 'dired-mode-hook (lambda () (setq truncate-lines t)))
@@ -912,7 +1064,7 @@ Modernizes Emacs' dired: column-based,  file previews
          ("y"   . dirvish-yank-menu)        ;; Advanced copy/paste/move engine
          
          ;; 1. Search current directory and subdirectories (requires 'fd' installed)
-         ("f"   . dirvish-fd)               
+         ("f"   . dirvish-fd)              
          
          ;; --- Essential Recommended Shortcuts ---
          ("TAB" . dirvish-subtree-toggle)   ;; Expand/collapse directory trees in place
