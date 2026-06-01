@@ -66,9 +66,18 @@
      default))
  '(org-safe-remote-resources
    '("\\`https://fniessen\\.github\\.io/org-html-themes/org/theme-readtheorg\\.setup\\'"))
- '(package-selected-packages nil)
+ '(package-selected-packages
+   '(auctex auto-dark auto-package-update consult corfu diff-hl dirvish
+            doom-themes exec-path-from-shell flycheck git-timemachine
+            image-slicing leetcode lsp-pyright lsp-ui magit marginalia
+            mixed-pitch mood-line olivetti orderless org-autolist
+            org-download org-modern solaire-mode super-save
+            symbol-overlay terraform-mode toc-org
+            treemacs-all-the-icons undo-fu vertico
+            vscode-dark-plus-theme whole-line-or-region wrap-region))
  '(package-vc-selected-packages
-   '((image-slicing :vc-backend Git :url
+   '((org-excalidraw :url "https://github.com/wdavew/org-excalidraw")
+     (image-slicing :vc-backend Git :url
                     "https://github.com/ginqi7/image-slicing"))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
@@ -81,3 +90,4 @@
  '(org-level-2 ((t (:inherit variable-pitch :height 1.1 :weight semi-bold))))
  '(org-level-3 ((t (:inherit variable-pitch :height 1.0 :weight medium))))
  '(org-level-4 ((t (:inherit variable-pitch :height 1.0 :weight normal)))))
+

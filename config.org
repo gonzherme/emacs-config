@@ -81,18 +81,7 @@ Update packages every 60 days
 #+end_src
 
 * Startup Speed
-Function to print out the duration of Emacs startup:
-#+begin_src emacs-lisp
-(defun efs/display-startup-time ()
-  (message "Emacs loaded in %s with %d garbage collections."
-           (format "%.2f seconds"
-                   (float-time
-                   (time-subtract after-init-time before-init-time)))
-           gcs-done))
-
-(add-hook 'emacs-startup-hook #'efs/display-startup-time)
-#+end_src
-
+** Garbage Collection
 Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800KB). Because loading packages generates a lot of garbage, Emacs will pause hundreds of times during startup just to clean up memory.
 #+begin_src emacs-lisp
 ;; Make startup faster by reducing the frequency of garbage collection
@@ -277,8 +266,7 @@ Initial source: [[https://github.com/wwxodus/Letters/blob/main/Letters.el][lette
 
 ;; Changing from light to dark depending on Mac OS system
 (use-package auto-dark
-  :config
-  ;; 1. Set themes
+  :config  ;; 1. Set themes
   (setq auto-dark-themes '((vscode-dark-plus) (modus-operandi)))
 
   ;; 2. Define visual tweaks that themes natively try to overwrite
@@ -320,10 +308,8 @@ Initial source: [[https://github.com/wwxodus/Letters/blob/main/Letters.el][lette
   ;; 4. Hook them into auto-dark's transitions
   (add-hook 'auto-dark-dark-mode-hook #'my/set-titlebar-dark)
   (add-hook 'auto-dark-light-mode-hook #'my/set-titlebar-light)
-
-  ;; 5. Don't do (auto-dark-mode 1), because makes OS syscalls that take time, increase startup time
-  ;; can defer it for 1.5 seconds before starting it
-  (run-with-idle-timer 1.5 nil (lambda () (auto-dark-mode 1)))
+  
+  ;; 5. enable
   (auto-dark-mode 1)
 )
 #+end_src
@@ -413,19 +399,19 @@ Emacs-mac scrolling
 Making image scrolling smooth
 #+begin_src emacs-lisp
 ;; Force Emacs to fetch the repository if you don't have it locally
-(unless (package-installed-p 'image-slicing)
-  (package-vc-install "https://github.com/ginqi7/image-slicing"))
+;; (unless (package-installed-p 'image-slicing)
+;;   (package-vc-install "https://github.com/ginqi7/image-slicing"))
 
-(use-package image-slicing
-  :config
-  ;; -- EWW Configuration --
-  ;; Cancels the default eww image render and uses image-slicing
-  (add-to-list 'shr-external-rendering-functions '(img . image-slicing-tag-img))
-  (push #'image-slicing-mode eww-after-render-hook)
+;; (use-package image-slicing
+;;   :config
+;;   ;; -- EWW Configuration --
+;;   ;; Cancels the default eww image render and uses image-slicing
+;;   (add-to-list 'shr-external-rendering-functions '(img . image-slicing-tag-img))
+;;   (push #'image-slicing-mode eww-after-render-hook)
 
-  ;; -- Elfeed Configuration (Optional) --
-  ;; Advice `elfeed-show-entry` to trigger `image-slicing-mode`
-  (advice-add #'elfeed-show-entry :after #'image-slicing-mode))
+;;   ;; -- Elfeed Configuration (Optional) --
+;;   ;; Advice `elfeed-show-entry` to trigger `image-slicing-mode`
+;;   (advice-add #'elfeed-show-entry :after #'image-slicing-mode))
 #+end_src
 ** Solaire mode
 Dims buffers not in use ([[https://github.com/hlissner/emacs-solaire-mode][source]])
@@ -589,15 +575,19 @@ Which-key (suggests commands)
 Corfu (new version of autocomplete)
 #+begin_src emacs-lisp
 (use-package corfu
-  ;; defer loading vertico until after startup (reduces startup time)
-  :hook (after-init . vertico-mode)
+  :hook (prog-mode . corfu-mode)
   :custom
-  (corfu-auto t)                 ;; Enable auto completion
-  (corfu-auto-delay 0.1)         ;; Very fast popup
-  (corfu-auto-prefix 2)          ;; Start after 2 chars
-  (corfu-quit-no-match t)        ;; Quit if no match
-  :init
-  (global-corfu-mode))
+  (corfu-auto t)
+  (corfu-auto-delay 0.1)   ;; delay before showing suggestions
+  (corfu-auto-prefix 2)    ;; number of characters you have to type before showing suggestionsg
+  (corfu-quit-no-match t)  ;; remove autocomplete list if no matches found
+  
+  ;; more secondary settings
+  (corfu-cycle t)                      ;; C-n on bottom suggestion cycles back to the top
+  (corfu-on-exact-match nil)           ;; Don't auto-insert exact matches aggressively
+  (corfu-quit-at-boundary 'separator)  ;; Handle space-separated fuzzy matching smoothly
+  (corfu-preselect 'valid)             ;; Smart highlight of the first valid candidate  
+)
 #+end_src
 
 
@@ -654,12 +644,10 @@ Flycheck
 #+begin_src emacs-lisp
 (use-package flycheck
   :defer t
-  :diminish ;;explanation of what diminish does, search for "DIMINISH"
-  :init (global-flycheck-mode)
+  :diminish
+  :hook (prog-mode . global-flycheck-mode) ;; Only activate when you actually enter programming modes
   :config
-  ;; only check syntax when file saved (to not cause typing lag)
-  (setq flycheck-check-syntax-automatically '(save mode-enable))
-)
+  (setq flycheck-check-syntax-automatically '(save mode-enable)))
 #+end_src
 
 imenu
@@ -713,7 +701,8 @@ Markdown mode
   :mode ("\\.md\\'" . markdown-mode))
 #+end_src
 
-* Org Mode
+* Org
+Org mode config
 #+begin_src emacs-lisp
 (use-package org
   :defer t
@@ -743,7 +732,10 @@ Markdown mode
   ;; Make org subscripts defined with: _{}
   (setq org-use-sub-superscripts '{})
 )
+#+end_src
 
+Mixed-pitch
+#+begin_src emacs-lisp
 ;; [NEW] Mixed-pitch: This ensures that while your regular text uses Sans-Serif,
 ;; your Org-mode code blocks and tables stay cleanly aligned in Monospace!
 (use-package mixed-pitch
@@ -751,8 +743,10 @@ Markdown mode
 :config
  ;; tells mixed-pitch to respect your custom variable-pitch height!
   (setq mixed-pitch-set-height t))
+#+end_src
 
-;; Org modern
+Org modern
+#+begin_src  emacs-lisp
  (use-package org-modern
   :hook (org-mode . org-modern-mode)
   :config
@@ -802,8 +796,44 @@ Org mode faces and fonts
  ;; ensures code blocks inside Org-mode don't have the line spacing applied to text org mode lines
  '(org-block ((t (:inherit fixed-pitch :line-spacing 0.0))))
 )
-
 #+end_src
+
+** *Org Excalidraw*
+Somewhat complicated configuration, downloads required are detailed [[https://github.com/wdavew/org-excalidraw][here]]
+Using a slightly more [[https://github.com/4honor/org-excalidraw][modern version]] that improves the rendering
+#+begin_src emacs-lisp
+(add-to-list 'load-path "~/.emacs.d/my-packages")
+
+;; Set variables before requiring the package
+(setq org-excalidraw-directory "~/org-excalidraw-drawings")
+(require 'org-excalidraw)
+
+;; Explicitly wait until Org is fully awake before registering the links
+(with-eval-after-load 'org
+  (org-excalidraw-initialize))
+#+end_src
+
+Making opening images in org mode doable with a left click
+#+begin_src emacs-lisp
+;; Make Org inline images single-left-clickable
+(defun my-org-image-click-fix (&rest _args)
+  "Add a keymap to Org image overlays to allow opening with a single left click."
+  (let ((image-map (make-sparse-keymap)))
+    ;; Bind left-click to move the cursor to the mouse and open the link
+    (define-key image-map [mouse-1]
+      (lambda (event)
+        (interactive "e")
+        (mouse-set-point event)
+        (org-open-at-point)))
+    ;; Find all image overlays in the file and attach the custom click map
+    (dolist (ov (overlays-in (point-min) (point-max)))
+      (when (overlay-get ov 'org-image-overlay)
+        (overlay-put ov 'keymap image-map)))))
+
+;; Run this fix automatically every time Org mode draws images
+(advice-add 'org-display-inline-images :after #'my-org-image-click-fix)
+#+end_src
+
 
 * Latex
 Auctex
@@ -878,17 +908,20 @@ Indenting
 ** LSP Mode
 #+begin_src emacs-lisp
 (use-package lsp-mode
-  :custom
-  ;; Tell LSP not to auto-configure company-mode, using corfu
-  (lsp-completion-provider :none)
+  :defer t
   :commands (lsp lsp-deferred)
-  :hook ((python-mode . lsp-deferred)
-         (c-mode . lsp-deferred)
-	 ;; (c++-mode . lsp-deferred)
-         (go-mode . lsp-deferred))
+  :custom
+  (lsp-completion-provider :none)
+  :init
+  ;; Explicitly clear out the internal macro that forces the org-mode cross-check
+  (setq lsp-org-attributes nil)
+  
+  ;; Use a clean, isolated top-level hook that doesn't trigger use-package parsing loops
+  (add-hook 'prog-mode-hook #'lsp-deferred)
+  
   :config
   (global-set-key [C-mouse-1] #'lsp-ui-peek-find-definitions)
-  (setq lsp-headerline-breadcrumb-enable 1)) ; we'll use a different method for function tracking
+  (setq lsp-headerline-breadcrumb-enable 1))
 
 (use-package lsp-ui
   :after lsp-mode
@@ -898,17 +931,16 @@ Indenting
   (lsp-enable-which-key-integration t)
   (setq lsp-ui-doc-enable t
         lsp-ui-doc-include-signature t
-        lsp-ui-sideline-enable nil ;; disable sideline
-        lsp-ui-doc-position 'at-point   ;; where to show the popup
-        lsp-ui-doc-show-with-cursor nil ;; don't show popup if (text) cursor is on word
-        lsp-ui-doc-show-with-mouse t)) ;; shows variable/function info when mouse hovers over
+        lsp-ui-sideline-enable nil
+        lsp-ui-doc-position 'at-point
+        lsp-ui-doc-show-with-cursor nil
+        lsp-ui-doc-show-with-mouse t))
 #+end_src
-
 ** LSP Servers
 #+begin_src emacs-lisp
 ;; 1. PYRIGHT (installed with npm install -g pyright)
 (use-package lsp-pyright
-  :hook (python-mode . (lambda () (require 'lsp-pyright) (lsp))))
+  :hook (python-mode . (lambda () (require 'lsp-pyright))))
 
 ;; 2. Gopls (go server, installed via homebrew)
 #+end_src
@@ -1009,13 +1041,14 @@ Tiny tweaks
   (set-face-attribute 'treemacs-directory-face nil :height 0.85)
   (set-face-attribute 'treemacs-file-face nil :height 0.85)
   (set-face-attribute 'treemacs-tags-face nil :height 0.85)
-  ;; explained here: https://github.com/Alexander-Miller/treemacs#git-mode
+  ;; hide modeline in treemacs
+  (add-hook 'treemacs-mode-hook (lambda () (setq mode-line-format nil)))
+  ;; git mode (https://github.com/Alexander-Miller/treemacs#git-mode)
   (treemacs-git-mode 'extended))
 
 ;; To get the specific VS Code style icons:
 (use-package treemacs-all-the-icons  :config
   (treemacs-load-theme "all-the-icons"))
-
 #+end_src
 ** Dirvish
 Two command line tools must be installed:
@@ -1076,9 +1109,10 @@ Modernizes Emacs' dired: column-based,  file previews
 * Leetcode
 #+begin_src emacs-lisp
 (use-package leetcode
-    :config
-    (setq leetcode-prefer-language "cpp")
-    (setq leetcode-save-solutions t)
-    (setq leetcode-directory "~/gonz/cs/notes/algorithms/leetcode"))
+  :defer t
+  :config
+  (setq leetcode-prefer-language "cpp")
+  (setq leetcode-save-solutions t)
+  (setq leetcode-directory "~/gonz/cs/notes/algorithms/leetcode"))
 #+end_src
 
