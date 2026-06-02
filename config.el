@@ -611,7 +611,10 @@
   
   ;; Clean Apple-style bullet points for standard lists (- or + or *)
   (setq org-modern-list 
-        '((43 . "•")) ; plus sign becomes a solid dot
+        '((45 . "•") ; - becomes a solid dot
+          (43 . "-") ; + becomes a dash
+          )
+        )
   )
 
 ;; makes bulleted and numbered lists behave like modern editor (gdocs, pages)
@@ -622,7 +625,6 @@
 ;; Toc-org: table of contents
 (use-package toc-org
   :hook (org-mode . toc-org-enable))
-)
 
 ;; Better previews (SVG) if available
 (setq org-preview-latex-default-process 'dvisvgm)

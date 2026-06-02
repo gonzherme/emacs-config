@@ -760,7 +760,10 @@ Org modern
   
   ;; Clean Apple-style bullet points for standard lists (- or + or *)
   (setq org-modern-list 
-        '((43 . "•")) ; plus sign becomes a solid dot
+        '((45 . "•") ; - becomes a solid dot
+          (43 . "-") ; + becomes a dash
+          )
+        )
   )
 
 ;; makes bulleted and numbered lists behave like modern editor (gdocs, pages)
@@ -771,7 +774,6 @@ Org modern
 ;; Toc-org: table of contents
 (use-package toc-org
   :hook (org-mode . toc-org-enable))
-)
 #+end_src
 
 Redering latex in org-mode
@@ -833,7 +835,6 @@ Making opening images in org mode doable with a left click
 ;; Run this fix automatically every time Org mode draws images
 (advice-add 'org-display-inline-images :after #'my-org-image-click-fix)
 #+end_src
-
 
 * Latex
 Auctex
