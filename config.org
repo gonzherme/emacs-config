@@ -970,6 +970,7 @@ Indenting
 * Modernize Text Editing
 Copy/Paste/Undo/Redo
 #+begin_src emacs-lisp
+(setq use-short-answers t)   ;; Change all "yes/no" prompts to "y/n"
 (delete-selection-mode 1)    ;; typing on selected text deletes it
 (save-place-mode 1)          ;; remember cursor location in files after closing
 (global-auto-revert-mode t)  ;; automatically show changes if the file has changed
@@ -1177,9 +1178,3 @@ Modernizes Emacs' dired: column-based,  file previews
   ;; - To save the session at regular intervals, and when Emacs exits.
   (easysession-setup))
   #+end_src
-
-* Misc
-Use =y/n= instead of =yes/no= for confirming emacs actions
-#+begin_src emacs-lisp
-(setq use-short-answers t)
-#+end_src
