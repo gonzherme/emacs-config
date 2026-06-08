@@ -66,15 +66,7 @@
      default))
  '(org-safe-remote-resources
    '("\\`https://fniessen\\.github\\.io/org-html-themes/org/theme-readtheorg\\.setup\\'"))
- '(package-selected-packages
-   '(auctex auto-dark auto-package-update consult corfu diff-hl dirvish
-            doom-themes exec-path-from-shell flycheck git-timemachine
-            image-slicing leetcode lsp-pyright lsp-ui magit marginalia
-            mixed-pitch mood-line olivetti orderless org-autolist
-            org-download org-modern solaire-mode super-save
-            symbol-overlay terraform-mode toc-org
-            treemacs-all-the-icons undo-fu vertico
-            vscode-dark-plus-theme whole-line-or-region wrap-region))
+ '(package-selected-packages nil)
  '(package-vc-selected-packages
    '((org-excalidraw :url "https://github.com/wdavew/org-excalidraw")
      (image-slicing :vc-backend Git :url

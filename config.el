@@ -8,21 +8,17 @@
 
 
 ;; Tell Emacs where to look for Homebrew binaries and GNU utilities on macOS
-(when (eq system-type 'darwin)
-  
+(when (eq system-type   
   ;; macOS defaults to older BSD utilities. If you installed GNU coreutils via Homebrew 
   ;; (for tools like a modern `ls` or `gls`), Emacs needs to know where they live.
   ;; We target the Apple Silicon specific Homebrew path.
-  (let ((gnu-path "/opt/homebrew/opt/coreutils/libexec/gnubin"))
-    
+  (let ((gnu-path "/opt/homebrew/opt/coreutils/libexec/gnubin"))    
     ;; Check if the directory actually exists so it doesn't throw errors on Intel Macs or Linux
-    (when (file-directory-p gnu-path)
-      
+    (when (file-directory-p gnu-path)      
       ;; 1. Update the internal terminal's $PATH so tools run inside Emacs find GNU utils first
-      (setenv "PATH" (concat gnu-path ":" (getenv "PATH")))
-      
+      (setenv "PATH" (concat gnu-path ":" (getenv "PATH")))      
       ;; 2. Update Emacs's own command search path so it natively uses GNU utils over macOS defaults
-      (add-to-list 'exec-path gnu-path))))
+      (add-to-list 'exec-path gnu-path)))))
 
 ;; Initialize package sources
 (require 'package)
@@ -41,7 +37,6 @@
   :custom
   (auto-package-update-interval 60)
   (auto-package-update-prompt-before-update t)
-  (auto-package-update-hide-results t)
   :config
   ;; Run the update check smoothly in the background post-startup (to reduce startup time)
   (run-with-idle-timer 5 nil #'auto-package-update-maybe)
@@ -343,48 +338,57 @@
 ;; Turn the mode on
 (window-divider-mode 1)
 
-;; 1. Enable built-in workspace tabs
-(tab-bar-mode 1)
+;; Option 1: just close the tab
+(global-set-key (kbd "M-w") #'tab-close)
 
-;; 2. Core Visuals
-(setq tab-bar-show 1)                      
-(setq tab-bar-close-button-show nil)       
-(setq tab-bar-new-button-show nil)         
+;; Option 2: close the tab and kill all buffers in that tab
+;; (defun my/tab-close-and-kill-buffers ()
+;;   "Close the current tab and kill all buffers that were visible inside it."
+;;   (interactive)
+;;   ;; 1. Capture all unique buffers visible in the current tab's windows
+;;   (let ((buffers-to-kill (delete-dups (mapcar #'window-buffer (window-list)))))
+;;     ;; 2. Close the tab first (switches to the next tab safely)
+;;     (tab-close)
+;;     ;; 3. Loop through and kill the captured buffers
+;;     (dolist (buf buffers-to-kill)
+;;       (when (and (buffer-live-p buf)
+;;                  (not (minibufferp buf))
+;;                  (not (string-prefix-p " " (buffer-name buf)))) ; Skip internal hidden buffers
+;;         (kill-buffer buf)))))
 
-;; 3. Modern UI Styling (The "Browser" Illusion)
-(setq tab-bar-tab-name-format-function
-      (lambda (tab i)
-        (let ((current-p (eq (car tab) 'current-tab)))
-          (propertize
-           (concat "  " (alist-get 'name tab) "  ")
-           'face (if current-p 'tab-bar-tab 'tab-bar-tab-inactive)))))
-
-;; 4. New Tab Behavior
-(defun my/tab-bar-new-untitled-buffer ()
-  "Generates a new untitled buffer instead of *scratch*."
-  (generate-new-buffer "untitled"))
-
-(setq tab-bar-new-tab-choice #'my/tab-bar-new-untitled-buffer)
-
-;; 5. Shortcuts
-(defun my/tab-close-and-kill-buffers ()
-  "Close the current tab and kill all buffers that were visible inside it."
-  (interactive)
-  ;; 1. Capture all unique buffers visible in the current tab's windows
-  (let ((buffers-to-kill (delete-dups (mapcar #'window-buffer (window-list)))))
-    ;; 2. Close the tab first (switches to the next tab safely)
-    (tab-close)
-    ;; 3. Loop through and kill the captured buffers
-    (dolist (buf buffers-to-kill)
-      (when (and (buffer-live-p buf)
-                 (not (minibufferp buf))
-                 (not (string-prefix-p " " (buffer-name buf)))) ; Skip internal hidden buffers
-        (kill-buffer buf)))))
+;; (global-set-key (kbd "M-w") #'my/tab-close-and-kill-buffers)
 
 (global-set-key (kbd "M-t") #'tab-new)
-(global-set-key (kbd "M-w") #'my/tab-close-and-kill-buffers)
 (global-set-key (kbd "<C-tab>") #'tab-next)
 (global-set-key (kbd "<C-S-tab>") #'tab-previous)
+
+(use-package vim-tab-bar
+  :commands vim-tab-bar-mode
+  :hook
+  (after-init . vim-tab-bar-mode))
+
+;; ;; 1. Enable built-in workspace tabs
+;; (tab-bar-mode 1)
+
+;; ;; 2. Core Visuals
+;; (setq tab-bar-show 1)                      
+;; (setq tab-bar-close-button-show nil)       
+;; (setq tab-bar-new-button-show nil)         
+
+;; ;; 3. Modern UI Styling (The "Browser" Illusion)
+;; (setq tab-bar-tab-name-format-function
+;;       (lambda (tab i)
+;;         (let ((current-p (eq (car tab) 'current-tab)))
+;;           (propertize
+;;            (concat "  " (alist-get 'name tab) "  ")
+;;            'face (if current-p 'tab-bar-tab 'tab-bar-tab-inactive)))))
+
+;; ;; 4. New Tab Behavior
+;; (defun my/tab-bar-new-untitled-buffer ()
+;;   "Generates a new untitled buffer instead of *scratch*."
+;;   (generate-new-buffer "untitled"))
+
+;; (setq tab-bar-new-tab-choice #'my/tab-bar-new-untitled-buffer)
 
 ;; (use-package centaur-tabs
 ;;   :demand t
@@ -774,9 +778,20 @@
   (whole-line-or-region-global-mode))
 
 (use-package super-save
+  :ensure t
   :config
-  (setq super-save-auto-save-when-idle t
-        super-save-idle-duration 1) ;; save after 1s idle
+  ;; 1. Explicitly ensure context-driven triggers are active
+  ;; (Saves when clicking away from Emacs, changing buffers, or moving windows)
+  (setq super-save-when-focus-lost t)
+  
+  ;; 2. SILENT MODE: Stop the echo area from spamming "Wrote file..." 
+  ;; every time you switch tabs or look away.
+  (setq super-save-silent t)
+
+  ;; 3. Ensure it cleanly catches code blocks edited inside Org-mode
+  (setq super-save-handle-org-src t)
+
+  ;; Enable the mode globally
   (super-save-mode +1))
 
 (setq make-backup-files nil)  ;; Disable backup files like file~
@@ -838,14 +853,6 @@
 (use-package treemacs-all-the-icons  :config
   (treemacs-load-theme "all-the-icons"))
 
-;; Tell Emacs where to look for Homebrew binaries and GNU utilities on macOS
-(when (eq system-type 'darwin)
-  ;; For Apple Silicon Macs (M1/M2/M3/M4)
-  (let ((gnu-path "/opt/homebrew/opt/coreutils/libexec/gnubin"))
-    (when (file-directory-p gnu-path)
-      (setenv "PATH" (concat gnu-path ":" (getenv "PATH")))
-      (add-to-list 'exec-path gnu-path))))
-
 (use-package dirvish
   :init
   ;; Open dirvish instead of default dired globally
@@ -888,3 +895,39 @@
   (setq leetcode-prefer-language "cpp")
   (setq leetcode-save-solutions t)
   (setq leetcode-directory "~/gonz/cs/notes/algorithms/leetcode"))
+
+(use-package easysession
+  ;; ':demand t' ensures the package is loaded immediately upon startup
+  :demand t
+
+  :config
+  ;; Key mappings
+  (global-set-key (kbd "C-c sl") #'easysession-switch-to) ; Load session without geometry
+  (global-set-key (kbd "C-c ss") #'easysession-save)      ; Save session
+  (global-set-key (kbd "C-c sL") #'easysession-switch-to-and-restore-geometry) ; Force geometry restore
+  (global-set-key (kbd "C-c sr") #'easysession-rename)
+  (global-set-key (kbd "C-c sR") #'easysession-reset)
+  (global-set-key (kbd "C-c su") #'easysession-unload)
+  (global-set-key (kbd "C-c sd") #'easysession-delete)
+  
+  ;; Save every 10 minutes
+  (setq easysession-save-interval (* 10 60))
+
+  ;; Save the current session when using `easysession-switch-to'
+  (setq easysession-switch-to-save-session t)
+
+  ;; Do not exclude the current session when switching sessions
+  (setq easysession-switch-to-exclude-current nil)
+
+  ;; Make `easysession-setup' load the session automatically.
+  (setq easysession-setup-load-session t)
+
+  ;; DEFAULT BEHAVIOR: Do not alter macOS frame geometry on standard switches
+  (setq easysession-frameset-restore-geometry nil)
+
+  ;; The `easysession-setup' function adds hooks:
+  ;; - To enable automatic session loading during `emacs-startup-hook'
+  ;; - To save the session at regular intervals, and when Emacs exits.
+  (easysession-setup))
+
+(setq use-short-answers t)
