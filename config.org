@@ -1,6 +1,7 @@
 #+TITLE: emacs config
 
-* Emacs Version
+* 1. Core System & Bootstrapping
+** Emacs Version
 Prefer =emacs-plus= over vanilla =emacs= and =emacs-mac=. The feature I care most about is scrolling, and =emacs-plus= is much better than the other emacs versions at that (on MacOS).
 
 *Installation*
@@ -10,7 +11,7 @@ brew install --cask emacs-plus-app
 #+end_src
 Further installation details in the [[https://github.com/d12frosted/homebrew-emacs-plus][official emacs-plus repository]]
 
-** Native Compilation
+*Native Compilation*
 =emacs-plus= comes by default with Native Compilation. If switch =emacs= version, make sure to download with native compilation
 
 Directly translates Emacs Lisp (Elisp) code into machine code
@@ -19,8 +20,7 @@ Directly translates Emacs Lisp (Elisp) code into machine code
 + much faster package execution (LSP integration)
 + everything will feel snappier, reducing UI stutter
 + faster startup time
-
-* System Paths & Binaries (macOS)
+** OS Integration & Paths
 #+begin_src emacs-lisp
 ;; macOS GUI applications do not naturally inherit environment variables (like $PATH)
 ;; from your terminal. This package forces Emacs to read your shell's profile
@@ -32,7 +32,7 @@ Directly translates Emacs Lisp (Elisp) code into machine code
 
 
 ;; Tell Emacs where to look for Homebrew binaries and GNU utilities on macOS
-(when (eq system-type   
+(when (eq system-type 'darwin)
   ;; macOS defaults to older BSD utilities. If you installed GNU coreutils via Homebrew 
   ;; (for tools like a modern `ls` or `gls`), Emacs needs to know where they live.
   ;; We target the Apple Silicon specific Homebrew path.
@@ -42,10 +42,21 @@ Directly translates Emacs Lisp (Elisp) code into machine code
       ;; 1. Update the internal terminal's $PATH so tools run inside Emacs find GNU utils first
       (setenv "PATH" (concat gnu-path ":" (getenv "PATH")))      
       ;; 2. Update Emacs's own command search path so it natively uses GNU utils over macOS defaults
-      (add-to-list 'exec-path gnu-path)))))
+      (add-to-list 'exec-path gnu-path))))
 #+end_src
+** Startup Optimization (Garbage Collection)
+Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800KB). Because loading packages generates a lot of garbage, Emacs will pause hundreds of times during startup just to clean up memory.
+#+begin_src emacs-lisp
+;; Make startup faster by reducing the frequency of garbage collection
+(setq gc-cons-threshold (* 100 1024 1024)
+      read-process-output-max (* 1024 1024))
 
-* Package Management System
+;; Reset GC to a reasonable normal value after startup
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 2 1024 1024))))
+#+end_src
+** Package Management
 #+begin_src emacs-lisp
 ;; import package
 (require 'package)
@@ -88,241 +99,15 @@ Update packages every 60 days
   (auto-package-update-at-time "09:00"))
 #+end_src
 
-* Startup Speed
-** Garbage Collection
-Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800KB). Because loading packages generates a lot of garbage, Emacs will pause hundreds of times during startup just to clean up memory.
+** Startup Screen
 #+begin_src emacs-lisp
-;; Make startup faster by reducing the frequency of garbage collection
-(setq gc-cons-threshold (* 100 1024 1024)
-      read-process-output-max (* 1024 1024))
-
-;; Reset GC to a reasonable normal value after startup
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (setq gc-cons-threshold (* 2 1024 1024))))
+(setq inhibit-startup-screen t) ;; hide default emacs startup screen
+;; Open dired ~/gonz/ on startup
+(setq initial-buffer-choice "~/gonz/")
 #+end_src
 
-* EasySession + Startup Screen
-- Saves open files, tabs, windows when exiting emacs
-- Have different layouts saved as sessions, easily switch between them
-- [[https://github.com/jamescherti/easysession.el][Source]]
-
-#+begin_src emacs-lisp
-(use-package easysession
-  ;; ':demand t' ensures the package is loaded immediately upon startup
-  :demand t
-  :config
-  ;; Key mappings
-  (global-set-key (kbd "C-c sl") #'easysession-switch-to) ; Load session without geometry
-  (global-set-key (kbd "C-c ss") #'easysession-save)      ; Save session
-  (global-set-key (kbd "C-c sL") #'easysession-switch-to-and-restore-geometry) ; Force geometry restore
-  (global-set-key (kbd "C-c sr") #'easysession-rename)
-  (global-set-key (kbd "C-c sR") #'easysession-reset)
-  (global-set-key (kbd "C-c su") #'easysession-unload)
-  (global-set-key (kbd "C-c sd") #'easysession-delete)
-  
-  ;; Autosave sessions when changes are made
-  (easysession-save-mode 1)
-  ;; Save the current session when using `easysession-switch-to'
-  (setq easysession-switch-to-save-session t)
-  ;; Do not exclude the current session when switching sessions
-  (setq easysession-switch-to-exclude-current nil)
-  ;;Don't modify macOS frame geometry on standard switches
-  (setq easysession-frameset-restore-geometry nil)
-
-  ;; Don't automatically load a session on startup.
-  ;; We want to show our launcher screen first.
-  (setq easysession-setup-load-session nil)
-
-  (easysession-setup)
-
-
-  ;; -----------------------------
-  ;; Easysession Startup screen
-  ;; -----------------------------
-  (define-derived-mode my-home-mode special-mode "Home"
-    "Minimal startup screen.")
-
-  (defun my-home-open-session ()
-    "Load session at point."
-    (interactive)
-    (let ((session (get-text-property (point) 'session-name)))
-      (when session
-        (easysession-switch-to session))))
-
-  (defun my-home-new-session ()
-    "Create a new session."
-    (interactive)
-    (call-interactively #'easysession-save))
-
-  (defun my-home-refresh ()
-    (let ((inhibit-read-only t))
-      (erase-buffer)
-
-      ;; Title
-      (insert "\n\n\n")
-      (insert (propertize
-               "Gonz's EMACS\n"
-               'face '(:height 3.0 :weight bold)))
-
-      (insert "\n")
-      (insert (propertize
-               "Sessions\n\n"
-               'face '(:height 1.4 :weight semi-bold)))
-
-      ;; Session list
-      (dolist (session (sort (easysession--get-all-names) #'string<))
-        (let ((start (point)))
-          (insert (format "  %s\n" session))
-          (add-text-properties
-           start
-           (1- (point))
-           `(session-name ,session
-                           mouse-face highlight))))
-
-      (insert "\n")
-      (insert
-       (propertize
-        "[n] New Session"
-        'face 'font-lock-comment-face))
-
-      (goto-char (point-min))))
-
-  ;; Keybindings for startup screen
-  (define-key my-home-mode-map (kbd "RET") #'my-home-open-session)
-  (define-key my-home-mode-map (kbd "<mouse-1>") #'my-home-open-session)
-  (define-key my-home-mode-map (kbd "n") #'my-home-new-session)
-
-(defun my-home-screen ()
-  "Display startup session launcher."
-  (delete-other-windows)   ;; <- add this
-  (switch-to-buffer "Home")
-  (my-home-mode)
-  (my-home-refresh))
-
-  ;; Show launcher on startup
-  (add-hook 'emacs-startup-hook #'my-home-screen))
-  #+end_src
-  
-* Keybindings
-Apple-like
-#+begin_src emacs-lisp
-(setq mac-command-modifier 'meta) ;; Cmd as M
-(global-set-key (kbd "M-c") 'kill-ring-save) ;; copy
-(global-set-key (kbd "M-v") 'yank) ;; paste
-(global-set-key (kbd "M-z") 'undo) ;; undo
-(global-set-key (kbd "M-a") 'mark-whole-buffer) ;; select all
-#+end_src
-
-Unbind some default keys
-#+begin_src emacs-lisp
-(global-unset-key (kbd "C-_")) ;; remove C-S-_ to undo
-(global-unset-key (kbd "C-y")) ;; remove  C-y to yank
-(global-unset-key (kbd "C-x h")) ;; remove C-x h to select all
-(global-unset-key (kbd "C-x C-s")) ;; remove save, its automatic
-#+end_src
-
-Mouse support
-#+begin_src emacs-lisp
-(global-unset-key [S-mouse-1])
-(setq shift-select-mode t)
-
-;; Make Shift + mouse-1 set the point (start selection)
-(global-set-key [S-mouse-1] 'mouse-set-point)
-
-;; Make Shift + drag extend the selection
-(global-set-key [S-down-mouse-1] 'mouse-save-then-kill)
-(global-set-key [S-drag-mouse-1] 'mouse-drag-region)
-#+end_src
-
-Cmd + Delete (without copying)
-#+begin_src emacs-lisp
-(defun my/backward-delete-word-no-clipboard ()
-  "Delete previous word without affecting the clipboard."
-  (interactive)
-  (let ((p (point)))
-    (backward-word 1)
-    (delete-region (point) p)))
-
-(global-set-key (kbd "M-<backspace>") #'my/backward-delete-word-no-clipboard)
-#+end_src
-
-Switch between buffers with direction
-#+begin_src emacs-lisp
-(use-package windmove
-  :custom
-  (windmove-wrap-around nil)
-  (windmove-create-window nil)
-  :config
-  (windmove-default-keybindings))
-#+end_src
-
-
-Disable text highlighting
-#+begin_src emacs-lisp
-(global-unset-key [M-down-mouse-1])
-(global-unset-key [M-drag-mouse-1])
-#+end_src
-
-* Custom Functions
-Quick file finding
-#+begin_src emacs-lisp
-;; config
-(defun config ()
-  (interactive)
-  ;; (delete-other-windows)
-  (find-file "~/.emacs.d/config.org")
-)
-
-;; gonz
-(defun gonz ()
-  (interactive)
-  ;; (delete-other-windows)
-  (dired "~/gonz/")
-)
-
-;; cs
-(defun cs ()
-  (interactive)
-  ;; (delete-other-windows)
-  (dired "~/gonz/cs")
-)
-#+end_src
-* Startup Options
-*Dashboard (idle)*
-#+begin_src emacs-lisp
-;; (use-package dashboard
-;;   :after all-the-icons
-;;   :config
-;;   (require 'all-the-icons)
-;;   (dashboard-setup-startup-hook)
-  
-;;   ;; UI Settings
-;;   (setq dashboard-center-content t)
-;;   (setq dashboard-startup-banner 'logo)
-;;   (setq dashboard-banner-logo-title "E M A C S")
-;;   (setq dashboard-set-heading-icons t)
-;;   (setq dashboard-set-file-icons t)
-;;   (setq dashboard-display-icons-p t)
-;;   (setq dashboard-icon-type 'all-the-icons)
-
-;;   ;; Configure Vanilla Widgets
-;;   (setq dashboard-items '((projects . 4)
-;;                           (recents  . 4)))
-  
-;;   (setq dashboard-titles '((recents  . "Recent Files")
-;;                            (projects . "Jump To Goals & Work")))
-
-  
-;;   ;; Hardcoded list of files to display under the projects widget
-;;   (setq dashboard-projects-list '("~/gonz/goals/social.org"
-;;                                   "~/gonz/goals/free-time.org"
-;;                                   "~/gonz/goals/finances.org"
-;;                                   "~/gonz/goals/two-sigma.org")))
-#+end_src
-
-* Visuals
-** No clutter
+* 2. Appearance & UI
+** Decluttering
 #+begin_src emacs-lisp
 (menu-bar-mode -1) ;; no menubar
 (tool-bar-mode -1) ;; no toolbars
@@ -346,23 +131,45 @@ Quick file finding
 (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
 (setq ns-use-proxy-icon nil)
 
-;; display line nums in progr mode
+;; display line nums in prog mode
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 (global-visual-line-mode t) ;; lines wrap around
 #+end_src
+** Fonts & Typography
+Fonts
+#+begin_src emacs-lisp
+;; JetBrains Mono for code...
+(set-face-attribute 'default nil :font "JetBrains Mono" :height 160 :weight 'medium)
+;; Apple notes font for text
+(set-face-attribute 'variable-pitch nil :font "SF Pro Text" :height 180 :weight 'normal)
+;; Make bold be semi-bold, looks more modern
+(set-face-attribute 'bold nil :weight 'semi-bold)
+#+end_src
 
-** Themes
+Cursor
+#+begin_src emacs-lisp
+;; cursor width
+(setq-default cursor-type '(bar . 2))
+;; Apple Notes Yellow Cursor
+(set-cursor-color "#E5A822")
+#+end_src
+
+All the icons
+#+begin_src emacs-lisp
+(use-package all-the-icons
+  :if (display-graphic-p))
+#+end_src
+
+** Themes & Auto-Dark
 [[https://emacsfodder.github.io/emacs-theme-editor/][Online tool]] to automate creating your own theme
-
 *** Import themes
 Doom themes
 #+begin_src emacs-lisp
 (use-package doom-themes
   :config
-  (setq doom-themes-enable-bold t) ;; if nil, bold is universally disabled
+  (setq doom-themes-enable-bold t)   ;; if nil, bold is universally disabled
   (setq doom-themes-enable-italic t) ;; if nil, italics is universally disabled  
-  (doom-themes-visual-bell-config);; enable flashing mode-line on errors
-  ;; (doom-themes-org-config) ;; corrects (and improves) org-mode's native fontification
+  (doom-themes-visual-bell-config)   ;; enable flashing mode-line on errors
 )
 #+end_src
 
@@ -385,7 +192,6 @@ My custom themes
 #+begin_src emacs-lisp
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
 #+end_src
-
 
 *** Auto Dark
 *Custom theme tweaks*
@@ -442,34 +248,7 @@ Automatically changes from light to dark depending on Mac OS system
 )
 #+end_src
 
-*** 
-
-** Cursor
-#+begin_src emacs-lisp
-;; cursor width
-(setq-default cursor-type '(bar . 2))
-;; Apple Notes Yellow Cursor
-(set-cursor-color "#E5A822")
-#+end_src
-
-** Font
-Testing out some shi
-#+begin_src emacs-lisp
-;; JetBrains Mono for code...
-(set-face-attribute 'default nil :font "JetBrains Mono" :height 160 :weight 'medium)
-;; Apple notes font for text
-(set-face-attribute 'variable-pitch nil :font "SF Pro Text" :height 180 :weight 'normal)
-;; Make bold be semi-bold, looks more modern
-(set-face-attribute 'bold nil :weight 'semi-bold)
-#+end_src
-
-** Modeline
-Hiding modeline globally:
-#+begin_src emacs-lisp
-(setq-default mode-line-format nil)
-#+end_src
-
-** Window size
+** Window Geometry & Margins
 #+begin_src emacs-lisp
 ;; Disable native macOS fullscreen virtual spaces transition
 (setq ns-use-native-fullscreen nil)
@@ -480,162 +259,13 @@ Hiding modeline globally:
 ;; Tell Emacs to maximize the window on startup
 (add-to-list 'default-frame-alist '(fullscreen . maximized))
 #+end_src
-
-** All the icons (provides icons)
+** Modeline
+Hiding modeline globally:
 #+begin_src emacs-lisp
-(use-package all-the-icons
-  :if (display-graphic-p))
+(setq-default mode-line-format nil)
 #+end_src
-
-** Transparency
-#+begin_src emacs-lisp
-;; 0..100 (100 = opaque, 0 = fully transparent)
-;; (add-to-list 'default-frame-alist '(alpha . (90 . 90)))
-;; (add-to-list 'default-frame-alist '(alpha . (95 . 95)))
-;; (add-to-list 'default-frame-alist '(alpha . (98 . 98)))
-#+end_src
-** Scrolling
-Emacs-plus scrolling
-#+begin_src emacs-lisp
-(pixel-scroll-precision-mode 1)
-#+end_src
-
-Ensure highlighting of entire file is loaded on startup
-- avoids scrolling too quickly and reaching un-rendered regions of the file
-#+begin_src emacs-lisp
-(add-hook 'find-file-hook #'font-lock-ensure t)
-#+end_src
-
-Emacs-mac scrolling
-#+begin_src emacs-lisp
-  ;; Activate Yamamoto Mitsuharu's native smooth scrolling for Mac
-  ;; (mac-mouse-wheel-mode 1)
-#+end_src
-
-Making image scrolling smooth (not needed with =emacs-plus=)
-#+begin_src emacs-lisp
-;; Force Emacs to fetch the repository if you don't have it locally
-;; (unless (package-installed-p 'image-slicing)
-;;   (package-vc-install "https://github.com/ginqi7/image-slicing"))
-
-;; (use-package image-slicing
-;;   :config
-;;   ;; -- EWW Configuration --
-;;   ;; Cancels the default eww image render and uses image-slicing
-;;   (add-to-list 'shr-external-rendering-functions '(img . image-slicing-tag-img))
-;;   (push #'image-slicing-mode eww-after-render-hook)
-
-;;   ;; -- Elfeed Configuration (Optional) --
-;;   ;; Advice `elfeed-show-entry` to trigger `image-slicing-mode`
-;;   (advice-add #'elfeed-show-entry :after #'image-slicing-mode))
-#+end_src
-
-** Window Dividers
-Enable thin borders for both vertical and horizontal window splits
-#+begin_src emacs-lisp
-;; make divider color match theme color
-(set-face-background 'window-divider
-                     (face-background 'mode-line-inactive))
-;; 't' means both bottom and right
-(setq window-divider-default-places t)
-;; Thickness of horizontal line in pixels
-(setq window-divider-default-bottom-width 1)
-;; Thickness of vertical line in pixels
-(setq window-divider-default-right-width 1)
-;; Turn the mode on
-(window-divider-mode 1)
-#+end_src
-
-** Emacs Screen Saver
-*Zone*
-- emacs built-in screen saver package
-- screen saver function in =my-packages/letters.el=
-- stopped using zone-matrix, eats up CPU
-#+begin_src emacs-lisp
-(use-package zone
-  :ensure nil ;; built-in core package
-  :config
-  (require 'letters)
-  (setq zone-delete-other-windows t) ;; Forces full-frame screen takeover
-  ;; run my-packages/letters.el function on screen save
-  (setq zone-programs [zone-pgm-letters-minimal])
-
-  ;; on 10 mins of inactivity
-  (zone-when-idle 600))
-#+end_src
-
-* Window Splitting
-Default emacs window split, on split, cursor stays in same buffer
-Added these functions so that cursor moves to new buffer
-#+begin_src emacs-lisp
-(defun split-window-right-and-move ()
-  "Split the window vertically and move the cursor to the new window."
-  (interactive)
-  (split-window-right)
-  (other-window 1))
-
-(defun split-window-below-and-move ()
-  "Split the window horizontally and move the cursor to the new window."
-  (interactive)
-  (split-window-below)
-  (other-window 1))
-
-;; Remap the default keys to the new functions
-(global-set-key (kbd "C-x 3") 'split-window-right-and-move)
-(global-set-key (kbd "C-x 2") 'split-window-below-and-move)
-#+end_src
-
-* Margins
-*My custom margins*
-#+begin_src emacs-lisp
-;; Margin percentages
-(defvar my-single-window-margin-pct 0.1 ;; 10%
-  "Left margin as a fraction of window width when only one window exists.")
-
-(defvar my-multi-window-margin-pct 0.05 ;; 5%
-  "Left margin as a fraction of window width when multiple windows exist.")
-
-;; function that adjusts margins dynamically
-(defun my/update-window-margins (&optional _frame)
-  "Set left margins as a percentage of each window's width."
-  (let ((is-single (one-window-p t)))
-    (walk-windows
-     (lambda (win)
-       (let* ((width (window-total-width win))
-              (pct (if is-single
-                       my-single-window-margin-pct
-                     my-multi-window-margin-pct))
-              (margin (round (* width pct))))
-         (set-window-margins win margin nil)))
-     nil 'visible)))
-
-;; 3. Hook it so it runs automatically when you split or close windows
-(add-hook 'window-configuration-change-hook #'my/update-window-margins)
-
-;; 4. Remove fringes as you preferred in your original config
-(fringe-mode 0)
-
-;; 5. Run it once at startup to apply the margins immediately
-(my/update-window-margins)
-#+end_src
-
-
-*Olivetti* (deactivated, too heavy/bulky package for margins, which is what i really want)
-#+begin_src emacs-lisp
-;; (use-package olivetti
-;;   :hook ((text-mode . olivetti-mode)
-;;          (prog-mode . olivetti-mode))
-;;   :custom
-;;   ;; A float forces a strict window percentaged
-;;   (olivetti-body-width 0.85)
-;;   :config
-;;   ;; remove ugly fringes
-;;   (fringe-mode 0)
-;; )
-#+end_src
-
-* Tabs
-** Tab keybindings
+** Tabs
+*** Tab keybindings
 Closing a tab
 #+begin_src emacs-lisp
 ;; Option 1: just close the tab
@@ -665,7 +295,7 @@ Rest of shortcuts
 (global-set-key (kbd "<C-tab>") #'tab-next)
 (global-set-key (kbd "<C-S-tab>") #'tab-previous)
 #+end_src
-** Tab appearance
+*** Tab appearance
 *Vim tabs appearance package*
 the =:init= and =:config= consist of code to add dot to unsaved tabs like VSCode
 #+begin_src emacs-lisp
@@ -756,56 +386,357 @@ Not great, doesn't behave like standard modern tabs
 ;;   (centaur-tabs-mode t))
 #+end_src
 
-* Assist Tools
-Which-key (suggests commands)
+** Window Dividers
+Enable thin borders for both vertical and horizontal window splits
 #+begin_src emacs-lisp
-(use-package which-key
-  :init
-    (which-key-mode 1)
-  :diminish
-  :config
-  (setq which-key-side-window-location 'bottom
-        which-key-sort-order #'which-key-key-order-alpha
-        which-key-sort-uppercase-first nil
-        which-key-add-column-padding 1
-        which-key-max-display-columns nil
-        which-key-min-display-lines 6
-        which-key-side-window-slot -10
-        which-key-side-window-max-height 0.25
-        which-key-idle-delay 0.8
-        which-key-max-description-length 25
-        which-key-allow-imprecise-window-fit t
-        which-key-separator " → ")
-  )
+;; make divider color match theme color
+(set-face-background 'window-divider
+                     (face-background 'mode-line-inactive))
+;; 't' means both bottom and right
+(setq window-divider-default-places t)
+;; Thickness of horizontal line in pixels
+(setq window-divider-default-bottom-width 1)
+;; Thickness of vertical line in pixels
+(setq window-divider-default-right-width 1)
+;; Turn the mode on
+(window-divider-mode 1)
+#+end_src
+** Scrolling Setup
+Emacs-plus scrolling
+#+begin_src emacs-lisp
+(pixel-scroll-precision-mode 1)
 #+end_src
 
-Corfu + Cape (new version of autocomplete)
+Ensure highlighting of entire file is loaded on startup
+- avoids scrolling too quickly and reaching un-rendered regions of the file
 #+begin_src emacs-lisp
-(use-package corfu
-  :hook (prog-mode . corfu-mode)
+(add-hook 'find-file-hook #'font-lock-ensure t)
+#+end_src
+
+Emacs-mac scrolling
+#+begin_src emacs-lisp
+  ;; Activate Yamamoto Mitsuharu's native smooth scrolling for Mac
+  ;; (mac-mouse-wheel-mode 1)
+#+end_src
+
+Making image scrolling smooth (not needed with =emacs-plus=)
+#+begin_src emacs-lisp
+;; Force Emacs to fetch the repository if you don't have it locally
+;; (unless (package-installed-p 'image-slicing)
+;;   (package-vc-install "https://github.com/ginqi7/image-slicing"))
+
+;; (use-package image-slicing
+;;   :config
+;;   ;; -- EWW Configuration --
+;;   ;; Cancels the default eww image render and uses image-slicing
+;;   (add-to-list 'shr-external-rendering-functions '(img . image-slicing-tag-img))
+;;   (push #'image-slicing-mode eww-after-render-hook)
+
+;;   ;; -- Elfeed Configuration (Optional) --
+;;   ;; Advice `elfeed-show-entry` to trigger `image-slicing-mode`
+;;   (advice-add #'elfeed-show-entry :after #'image-slicing-mode))
+#+end_src
+** Transparency
+#+begin_src emacs-lisp
+;; 0..100 (100 = opaque, 0 = fully transparent)
+;; (add-to-list 'default-frame-alist '(alpha . (90 . 90)))
+;; (add-to-list 'default-frame-alist '(alpha . (95 . 95)))
+;; (add-to-list 'default-frame-alist '(alpha . (98 . 98)))
+#+end_src
+** Margins
+*My custom margins*
+#+begin_src emacs-lisp
+;; Margin percentages
+(defvar my-single-window-margin-pct 0.1 ;; 10%
+  "Left margin as a fraction of window width when only one window exists.")
+
+(defvar my-multi-window-margin-pct 0.05 ;; 5%
+  "Left margin as a fraction of window width when multiple windows exist.")
+
+;; function that adjusts margins dynamically
+(defun my/update-window-margins (&optional _frame)
+  "Set left margins as a percentage of each window's width."
+  (let ((is-single (one-window-p t)))
+    (walk-windows
+     (lambda (win)
+       (let* ((width (window-total-width win))
+              (pct (if is-single
+                       my-single-window-margin-pct
+                     my-multi-window-margin-pct))
+              (margin (round (* width pct))))
+         (set-window-margins win margin nil)))
+     nil 'visible)))
+
+;; 3. Hook it so it runs automatically when you split or close windows
+(add-hook 'window-configuration-change-hook #'my/update-window-margins)
+
+;; 4. Remove fringes as you preferred in your original config
+(fringe-mode 0)
+
+;; 5. Run it once at startup to apply the margins immediately
+(my/update-window-margins)
+#+end_src
+
+
+*Olivetti* (deactivated, too heavy/bulky package for margins, which is what i really want)
+#+begin_src emacs-lisp
+;; (use-package olivetti
+;;   :hook ((text-mode . olivetti-mode)
+;;          (prog-mode . olivetti-mode))
+;;   :custom
+;;   ;; A float forces a strict window percentage
+;;   (olivetti-body-width 0.85)
+;;   :config
+;;   ;; remove ugly fringes
+;;   (fringe-mode 0)
+;; )
+#+end_src
+** Imenu
+#+begin_src emacs-lisp
+;; (use-package imenu-list
+;;   :bind (("M-i" . imenu-list-smart-toggle))
+;;   ;; Hides centaur tabs only inside the imenu-list buffer
+;;   :hook ((imenu-list-major-mode . centaur-tabs-local-mode)
+;;          (org-mode . imenu-list-minor-mode)
+;;          (prog-mode . imenu-list-minor-mode))
+;;   :config
+;;   (setq imenu-list-position 'left)
+;;   (setq imenu-list-size 30)
+;;   (setq imenu-list-focus-after-activation nil)
+;;   (setq imenu-list-auto-resize t)
+;;   ;; Dynamic Theme Matching (Inherit from your active theme's faces)
+;;   (set-face-attribute 'imenu-list-entry-face-0 nil :inherit 'font-lock-keyword-face :weight 'bold)
+;;   (set-face-attribute 'imenu-list-entry-face-1 nil :inherit 'font-lock-function-name-face :weight 'normal)
+;;   (set-face-attribute 'imenu-list-entry-face-2 nil :inherit 'font-lock-variable-name-face)
+;;   (set-face-attribute 'imenu-list-entry-face-3 nil :inherit 'font-lock-comment-face)
+;; )
+#+end_src
+
+* 3. Editor Mechanics
+** Global Keybindings
+Apple-like
+#+begin_src emacs-lisp
+(setq mac-command-modifier 'meta) ;; Cmd as M
+(global-set-key (kbd "M-c") 'kill-ring-save) ;; copy
+(global-set-key (kbd "M-v") 'yank) ;; paste
+(global-set-key (kbd "M-z") 'undo) ;; undo
+(global-set-key (kbd "M-a") 'mark-whole-buffer) ;; select all
+#+end_src
+
+Unbind some default keys
+#+begin_src emacs-lisp
+(global-unset-key (kbd "C-_")) ;; remove C-S-_ to undo
+(global-unset-key (kbd "C-y")) ;; remove  C-y to yank
+(global-unset-key (kbd "C-x h")) ;; remove C-x h to select all
+(global-unset-key (kbd "C-x C-s")) ;; remove save, it's automatic
+#+end_src
+
+Mouse support
+#+begin_src emacs-lisp
+(global-unset-key [S-mouse-1])
+(setq shift-select-mode t)
+
+;; Make Shift + mouse-1 set the point (start selection)
+(global-set-key [S-mouse-1] 'mouse-set-point)
+
+;; Make Shift + drag extend the selection
+(global-set-key [S-down-mouse-1] 'mouse-save-then-kill)
+(global-set-key [S-drag-mouse-1] 'mouse-drag-region)
+#+end_src
+
+Cmd + Delete (without copying)
+#+begin_src emacs-lisp
+(defun my/backward-delete-word-no-clipboard ()
+  "Delete previous word without affecting the clipboard."
+  (interactive)
+  (let ((p (point)))
+    (backward-word 1)
+    (delete-region (point) p)))
+
+(global-set-key (kbd "M-<backspace>") #'my/backward-delete-word-no-clipboard)
+#+end_src
+
+Switch between buffers with direction
+#+begin_src emacs-lisp
+(use-package windmove
   :custom
-  (corfu-auto t)
-  (corfu-auto-delay 0.1)   ;; delay before showing suggestions
-  (corfu-auto-prefix 2)    ;; number of characters you have to type before showing suggestionsg
-  (corfu-quit-no-match t)  ;; remove autocomplete list if no matches found
+  (windmove-wrap-around nil)
+  (windmove-create-window nil)
+  :config
+  (windmove-default-keybindings))
+#+end_src
+
+Disable text highlighting
+#+begin_src emacs-lisp
+(global-unset-key [M-down-mouse-1])
+(global-unset-key [M-drag-mouse-1])
+#+end_src
+
+Zooming in/out
+#+begin_src emacs-lisp
+;; 1. Disable Ctrl + Mouse Scroll text zooming
+(global-set-key (kbd "<C-wheel-up>") 'ignore)
+(global-set-key (kbd "<C-wheel-down>") 'ignore)
+(global-set-key (kbd "<C-mouse-4>") 'ignore)
+(global-set-key (kbd "<C-mouse-5>") 'ignore)
+
+;; 2. Bind Meta and plus/minus to change text size
+(global-set-key (kbd "M-=") 'text-scale-increase)
+(global-set-key (kbd "M--") 'text-scale-decrease)
+#+end_src
+** Modernize Text Editing
+Copy/Paste/Undo/Redo
+#+begin_src emacs-lisp
+(setq use-short-answers t)   ;; Change all "yes/no" prompts to "y/n"
+(delete-selection-mode 1)    ;; typing on selected text deletes it
+(save-place-mode 1)          ;; remember cursor location in files after closing
+(global-auto-revert-mode t)  ;; automatically show changes if the file has changed
+
+;; undo and redo
+(use-package undo-fu
+  :config
+  (global-unset-key (kbd "C-z"))
+  (global-set-key (kbd "M-z")   'undo-fu-only-undo)
+  (global-set-key (kbd "M-Z") 'undo-fu-only-redo))
+
+;; apply copy/cut/delete to entire line
+(use-package whole-line-or-region
+  :config
+  (whole-line-or-region-global-mode))
+#+end_src
+
+Save undo's even after buffer closed
+#+begin_src emacs-lisp
+(use-package undo-fu-session
+  :after undo-fu
+  :config
+  (undo-fu-session-global-mode))
+#+end_src
+
+Autosaving setup
+#+begin_src emacs-lisp
+(use-package super-save
+  :config
+  (super-save-mode +1)
+  ;; save when away from emacs, changing buffers
+  (setq super-save-when-focus-lost t)
+  ;; save when idle
+  (setq super-save-auto-save-when-idle t)
+  ;; save if idle 0.5s
+  (setq super-save-idle-duration 0.5)
+  ;; save org src code blocks
+  (setq super-save-handle-org-src t)
+  ;; hide saving messages
+  (setq super-save-silent t))
+  #+end_src
+
+No backup files
+#+begin_src emacs-lisp
+(setq make-backup-files nil)  ;; Disable backup files like file~
+(setq auto-save-default nil)  ;; Disable auto-save files like #file#
+#+end_src
+
+Drag and drop images
+#+begin_src emacs-lisp
+(use-package org-download
+  :after org ;; lazily loads when org opens, not on startup, saves startup time
+  :custom
+  (org-download-method 'directory)
+  (org-download-image-dir "org-imgs")
+  (org-download-heading-lvl nil) ; this must be nil to stop folder creation
+  (org-download-timestamp-prefix-format nil) ; Optional: prevents timestamps in file names
+  (org-image-actual-width nil)
+  :config
+  (add-hook 'org-mode-hook 'org-download-enable) ;; enables in org mode
+  (add-hook 'dired-mode-hook 'org-download-enable) ;; enables in dired mode
   
-  ;; more secondary settings
-  (corfu-cycle t)                      ;; C-n on bottom suggestion cycles back to the top
-  (corfu-on-exact-match nil)           ;; Don't auto-insert exact matches aggressively
-  (corfu-quit-at-boundary 'separator)  ;; Handle space-separated fuzzy matching smoothly
-  (corfu-preselect 'valid)             ;; Smart highlight of the first valid candidate  
+  (setq org-download-annotate-function
+        (lambda (link)
+          "#+ATTR_ORG: :width 500\n")))
+#+end_src
+
+Cmd + K to insert link
+#+begin_src emacs-lisp
+;; insert a link. If text is selected, use it as the description and skip the prompt."
+(with-eval-after-load 'org
+  (defun my-org-insert-link-dwim ()
+    (interactive)
+    (if (use-region-p)
+        (let ((beg (set-marker (make-marker) (region-beginning)))
+              (end (set-marker (make-marker) (region-end)))
+              (region-text (buffer-substring-no-properties (region-beginning) (region-end))))
+          ;; Passing region-text as the 3rd argument tells Org to skip the description prompt
+          (org-insert-link nil nil region-text)
+          ;; Clean up the old plain text that was highlighted
+          (delete-region beg end)
+          (set-marker beg nil)
+          (set-marker end nil))
+      ;; If no text is selected, fall back to standard behavior
+      (call-interactively #'org-insert-link)))
+
+  ;; Bind your shortcut to the new wrapper function
+  (define-key org-mode-map (kbd "M-k") #'my-org-insert-link-dwim)
+)
+#+end_src
+
+Bold, Underline, Itallic -> will work for all markdown/text modes (not just org)
+#+begin_src emacs-lisp
+(use-package wrap-region
+  :config
+  ;; Enable wrap-region globally across all modes
+  (wrap-region-global-mode 1)
+  
+  ;; Define the global wrappers and their shortcut keys
+  ;; Syntax: (wrap-region-add-wrapper "left" "right" "trigger-key")
+  (wrap-region-add-wrapper "/" "/" "M-i")
+  (wrap-region-add-wrapper "_" "_" "M-u"))
+#+end_src
+
+** Window Splitting & Movement
+Default emacs window split, on split, cursor stays in same buffer
+Added these functions so that cursor moves to new buffer
+#+begin_src emacs-lisp
+(defun split-window-right-and-move ()
+  "Split the window vertically and move the cursor to the new window."
+  (interactive)
+  (split-window-right)
+  (other-window 1))
+
+(defun split-window-below-and-move ()
+  "Split the window horizontally and move the cursor to the new window."
+  (interactive)
+  (split-window-below)
+  (other-window 1))
+
+;; Remap the default keys to the new functions
+(global-set-key (kbd "C-x 3") 'split-window-right-and-move)
+(global-set-key (kbd "C-x 2") 'split-window-below-and-move)
+#+end_src
+** Custom Global Functions
+Quick file finding
+#+begin_src emacs-lisp
+;; config
+(defun config ()
+  (interactive)
+  ;; (delete-other-windows)
+  (find-file "~/.emacs.d/config.org")
 )
 
+;; gonz
+(defun gonz ()
+  (interactive)
+  ;; (delete-other-windows)
+  (dired "~/gonz/")
+)
 
-;; Cape provides extra completion backends (like file paths or history)
-(use-package cape
-  :init
-  ;; Add useful defaults to the completion-at-point-functions
-  (add-to-list 'completion-at-point-functions #'cape-file)
-  (add-to-list 'completion-at-point-functions #'cape-keyword))
+;; cs
+(defun cs ()
+  (interactive)
+  ;; (delete-other-windows)
+  (dired "~/gonz/cs")
+)
 #+end_src
-
-
+** Minibuffer & Search (Vertico/Consult/Orderless)
 Modern Command Palette (Replacing Ivy/Counsel)
 #+begin_src emacs-lisp
 ;; [NEW] Vertico: Fast, minimalist vertical completions
@@ -813,7 +744,16 @@ Modern Command Palette (Replacing Ivy/Counsel)
   ;; defer loading vertico until after startup (reduces startup time)
   :hook (after-init . vertico-mode)
   :custom
-  (vertico-cycle t)) ;; Cycle through options at the bottom
+  (vertico-cycle t) ;; Cycle through options at the bottom
+  :config
+  ;; C-x C-f, make single DEL delete entire directory path,
+  ;;           not one character only
+  (require 'vertico-directory)
+  (define-key vertico-map (kbd "DEL") #'vertico-directory-delete-char)
+
+  ;; UI: stop vertico from underlining C-x C-f, M-x
+  (set-face-attribute 'vertico-current nil :underline nil)
+)
 
 ;; [NEW] consult provides asynchronous search, live previews, and enhanced navigation commands
 (use-package consult
@@ -854,38 +794,132 @@ Modern Command Palette (Replacing Ivy/Counsel)
   (completion-styles '(orderless basic))
   (completion-category-overrides '((file (styles basic partial-completion)))))
 #+end_src
-
-Flycheck
+** Completion & Assistance (Corfu/Cape/Which-key)
+Corfu + Cape (new version of autocomplete)
 #+begin_src emacs-lisp
-(use-package flycheck
-  :defer t
-  :diminish
-  :hook (prog-mode . global-flycheck-mode) ;; Only activate when you actually enter programming modes
-  :config
-  (setq flycheck-check-syntax-automatically '(save mode-enable)))
+(use-package corfu
+  :hook (prog-mode . corfu-mode)
+  :custom
+  (corfu-auto t)
+  (corfu-auto-delay 0.1)   ;; delay before showing suggestions
+  (corfu-auto-prefix 2)    ;; number of characters you have to type before showing suggestionsg
+  (corfu-quit-no-match t)  ;; remove autocomplete list if no matches found
+  
+  ;; more secondary settings
+  (corfu-cycle t)                      ;; C-n on bottom suggestion cycles back to the top
+  (corfu-on-exact-match nil)           ;; Don't auto-insert exact matches aggressively
+  (corfu-quit-at-boundary 'separator)  ;; Handle space-separated fuzzy matching smoothly
+  (corfu-preselect 'valid)             ;; Smart highlight of the first valid candidate  
+)
+
+
+;; Cape provides extra completion backends (like file paths or history)
+(use-package cape
+  :init
+  ;; Add useful defaults to the completion-at-point-functions
+  (add-to-list 'completion-at-point-functions #'cape-file)
+  (add-to-list 'completion-at-point-functions #'cape-keyword))
 #+end_src
 
-imenu
+Which-key (suggests commands)
 #+begin_src emacs-lisp
-;; (use-package imenu-list
-;;   :bind (("M-i" . imenu-list-smart-toggle))
-;;   ;; Hides centaur tabs only inside the imenu-list buffer
-;;   :hook ((imenu-list-major-mode . centaur-tabs-local-mode)
-;;          (org-mode . imenu-list-minor-mode)
-;;          (prog-mode . imenu-list-minor-mode))
+(use-package which-key
+  :init
+    (which-key-mode 1)
+  :diminish
+  :config
+  (setq which-key-side-window-location 'bottom
+        which-key-sort-order #'which-key-key-order-alpha
+        which-key-sort-uppercase-first nil
+        which-key-add-column-padding 1
+        which-key-max-display-columns nil
+        which-key-min-display-lines 6
+        which-key-side-window-slot -10
+        which-key-side-window-max-height 0.25
+        which-key-idle-delay 0.8
+        which-key-max-description-length 25
+        which-key-allow-imprecise-window-fit t
+        which-key-separator " → ")
+  )
+#+end_src
+
+* 4. Session & Workspace
+** EasySession
+- Saves open files, tabs, windows when exiting emacs
+- Have different layouts saved as sessions, easily switch between them
+- [[https://github.com/jamescherti/easysession.el][Source]]
+
+#+begin_src emacs-lisp
+(use-package easysession
+  ;; ':demand t' ensures the package is loaded immediately upon startup
+  :demand t
+  :config
+  ;; Key mappings
+  (global-set-key (kbd "C-c sl") #'easysession-switch-to) ; Load session without geometry
+  (global-set-key (kbd "C-c ss") #'easysession-save)      ; Save session
+  (global-set-key (kbd "C-c sL") #'easysession-switch-to-and-restore-geometry) ; Force geometry restore
+  (global-set-key (kbd "C-c sr") #'easysession-rename)
+  (global-set-key (kbd "C-c sR") #'easysession-reset)
+  (global-set-key (kbd "C-c su") #'easysession-unload)
+  (global-set-key (kbd "C-c sd") #'easysession-delete)
+  
+  ;; Autosave sessions when changes are made
+  (easysession-save-mode 1)
+  ;; Save the current session when using `easysession-switch-to'
+  (setq easysession-switch-to-save-session t)
+  ;; Do not exclude the current session when switching sessions
+  (setq easysession-switch-to-exclude-current nil)
+  ;;Don't modify macOS frame geometry on standard switches
+  (setq easysession-frameset-restore-geometry nil)
+
+  ;; Don't automatically load a session on startup.
+  ;; We want to show our launcher screen first.
+  (setq easysession-setup-load-session nil)
+
+  (easysession-setup))
+  #+end_src
+** Dashboard (Idle)
+#+begin_src emacs-lisp
+;; (use-package dashboard
+;;   :after all-the-icons
 ;;   :config
-;;   (setq imenu-list-position 'left)
-;;   (setq imenu-list-size 30)
-;;   (setq imenu-list-focus-after-activation nil)
-;;   (setq imenu-list-auto-resize t)
-;;   ;; Dynamic Theme Matching (Inherit from your active theme's faces)
-;;   (set-face-attribute 'imenu-list-entry-face-0 nil :inherit 'font-lock-keyword-face :weight 'bold)
-;;   (set-face-attribute 'imenu-list-entry-face-1 nil :inherit 'font-lock-function-name-face :weight 'normal)
-;;   (set-face-attribute 'imenu-list-entry-face-2 nil :inherit 'font-lock-variable-name-face)
-;;   (set-face-attribute 'imenu-list-entry-face-3 nil :inherit 'font-lock-comment-face)
+;;   (require 'all-the-icons)
+;;   (dashboard-setup-startup-hook)
+  
+;;   ;; UI Settings
+;;   (setq dashboard-center-content t)
+;;   (setq dashboard-startup-banner 'logo)
+;;   (setq dashboard-banner-logo-title "E M A C S")
+;;   (setq dashboard-set-heading-icons t)
+;;   (setq dashboard-set-file-icons t)
+;;   (setq dashboard-display-icons-p t)
+;;   (setq dashboard-icon-type 'all-the-icons)
+
+;;   ;; Configure Vanilla Widgets
+;;   (setq dashboard-items '((projects . 4)
+;;                           (recents  . 4)))
+  
+;;   (setq dashboard-titles '((recents  . "Recent Files")
+;;                            (projects . "Jump To Goals & Work")))
+
+  
+;;   ;; Hardcoded list of files to display under the projects widget
+;;   (setq dashboard-projects-list '("~/gonz/goals/social.org"
+;;                                   "~/gonz/goals/free-time.org"
+;;                                   "~/gonz/goals/finances.org"
+;;                                   "~/gonz/goals/two-sigma.org")))
+#+end_src
+** Screen Saver (Idle)
+#+begin_src emacs-lisp
+;; (use-package zone
+;;   :config
+;;   (zone-when-idle 4)
 ;; )
 #+end_src
-* Git
+
+** 
+* 5. Major Modes & Applications
+** Git (Magit)
 Magit
 #+begin_src emacs-lisp
 (use-package magit
@@ -908,15 +942,9 @@ Git Timemachine
 (use-package git-timemachine
   :defer t)
 #+end_src
-
-* Markdown
-Markdown mode
-#+begin_src emacs-lisp
-(use-package markdown-mode
-  :mode ("\\.md\\'" . markdown-mode))
-#+end_src
-
-* Org Mode
+** Org Mode
+*** Visuals & Fonts
+*** Additional Packages (org-modern, toc-org)
 #+begin_src emacs-lisp
 (use-package org
   :defer t
@@ -953,14 +981,14 @@ Mixed-pitch
 ;; [NEW] Mixed-pitch: This ensures that while your regular text uses Sans-Serif,
 ;; your Org-mode code blocks and tables stay cleanly aligned in Monospace!
 (use-package mixed-pitch
-:hook (org-mode . mixed-pitch-mode)
-:config
- ;; tells mixed-pitch to respect your custom variable-pitch height!
+  :hook (org-mode . mixed-pitch-mode)
+  :config
+  ;; tells mixed-pitch to respect your custom variable-pitch height!
   (setq mixed-pitch-set-height t))
 #+end_src
 
 Org modern
-#+begin_src  emacs-lisp
+#+begin_src emacs-lisp
  (use-package org-modern
   :hook (org-mode . org-modern-mode)
   :config
@@ -1019,7 +1047,7 @@ Open org files with all content unfolded
 (setq org-startup-folded nil)
 #+end_src
 
-** *Org Excalidraw*
+*** *Org Excalidraw*
 Somewhat complicated configuration, downloads required are detailed [[https://github.com/wdavew/org-excalidraw][here]]
 Using a slightly more [[https://github.com/4honor/org-excalidraw][modern version]] that improves the rendering
 #+begin_src emacs-lisp
@@ -1053,29 +1081,13 @@ Making opening images in org mode doable with a left click
 (advice-add 'org-display-inline-images :after #'my-org-image-click-fix)
 #+end_src
 
-* Latex
-Auctex
+** Markdown Mode
 #+begin_src emacs-lisp
-(use-package auctex
-  :hook
-  (LaTeX-mode . turn-on-prettify-symbols-mode)
-  (LaTeX-mode . reftex-mode)
-  (LaTeX-mode . outline-minor-mode)
-  ;; (LaTeX-mode . olivetti-mode)
-  :config
-  (setq TeX-PDF-mode t) ;; always build PDFs
-  (setq TeX-engine 'xetex) ;; make the engine XeTeX
-  (setq TeX-command-default "LaTeX"))
+(use-package markdown-mode
+  :mode ("\\.md\\'" . markdown-mode))
 #+end_src
-
-Reftex
-#+begin_src emacs-lisp
-(setq reftex-toc-split-windows-horizontally t
-	  reftex-toc-split-windows-fraction     0.2)
-#+end_src
-
-* Programming Mode
-** Visuals
+** Programming
+*** Visuals
 Show line numbers
 #+begin_src emacs-lisp
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
@@ -1098,7 +1110,7 @@ Vertical indentation guide bars
 (add-hook 'prog-mode-hook #'indent-bars-mode)
 #+end_src
 
-** Editing
+*** Editing
 #+begin_src emacs-lisp
 ;; highlight all occurrences of word selected / cursor at
 (use-package symbol-overlay
@@ -1147,6 +1159,16 @@ Indenting
           (lambda ()
             (setq indent-tabs-mode nil  ; enforce spaces in C/C++
                   c-basic-offset 2)))
+#+end_src
+
+*** Flycheck
+#+begin_src emacs-lisp
+(use-package flycheck
+  :defer t
+  :diminish
+  :hook (prog-mode . global-flycheck-mode) ;; Only activate when you actually enter programming modes
+  :config
+  (setq flycheck-check-syntax-automatically '(save mode-enable)))
 #+end_src
 
 ** LSP
@@ -1213,136 +1235,102 @@ installed with =npm install -g pyright=
 
 Gopls (Golang): installed via homebrew
 
-* Modernize Text Editing
-Copy/Paste/Undo/Redo
+*
+** Latex
+Auctex
 #+begin_src emacs-lisp
-(setq use-short-answers t)   ;; Change all "yes/no" prompts to "y/n"
-(delete-selection-mode 1)    ;; typing on selected text deletes it
-(save-place-mode 1)          ;; remember cursor location in files after closing
-(global-auto-revert-mode t)  ;; automatically show changes if the file has changed
-
-;; undo and redo
-(use-package undo-fu
+(use-package auctex
+  :hook
+  (LaTeX-mode . turn-on-prettify-symbols-mode)
+  (LaTeX-mode . reftex-mode)
+  (LaTeX-mode . outline-minor-mode)
+  ;; (LaTeX-mode . olivetti-mode)
   :config
-  (global-unset-key (kbd "C-z"))
-  (global-set-key (kbd "M-z")   'undo-fu-only-undo)
-  (global-set-key (kbd "M-Z") 'undo-fu-only-redo))
+  (setq TeX-PDF-mode t) ;; always build PDFs
+  (setq TeX-engine 'xetex) ;; make the engine XeTeX
+  (setq TeX-command-default "LaTeX"))
+#+end_src
 
-;; apply copy/cut/delete to entire line
-(use-package whole-line-or-region
+Reftex
+#+begin_src emacs-lisp
+(setq reftex-toc-split-windows-horizontally t
+	  reftex-toc-split-windows-fraction     0.2)
+#+end_src
+
+
+** Leetcode
+#+begin_src emacs-lisp
+(use-package leetcode
+  :defer t
   :config
-  (whole-line-or-region-global-mode))
+  (setq leetcode-prefer-language "cpp")
+  (setq leetcode-save-solutions t)
+  (setq leetcode-directory "~/gonz/cs/notes/algorithms/leetcode"))
 #+end_src
 
-Save undo's even after buffer closed
-#+begin_src emacs-lisp
-(use-package undo-fu-session
-  :after undo-fu
-  :config
-  (undo-fu-session-global-mode))
-#+end_src
 
-Built-in file autosaving setup (instead of saving into ~ file, saves file itself)
-#+begin_src emacs-lisp
-(setq auto-save-visited-interval 0.5) ;; save after 0.5s of idle time
-(auto-save-visited-mode 1)
-
-;; globally silence saving buffer message
-(setq save-silently t)
-  #+end_src
-
-[[https://github.com/bbatsov/super-save][super-save]] not required, built-in good enough
-#+begin_src emacs-lisp
-;; (use-package super-save
-;;   :config
-;;   ;; saves when clicking away from Emacs, changing buffers, or moving windows
-;;   (setq super-save-when-focus-lost t)  
-;;   ;; silent mode: don't show "Wrote file..." on mini-buffer on every save
-;;   (setq super-save-silent t)
-;;   ;; ensure it saves org src code blocks
-;;   (setq super-save-handle-org-src t)
-;;   ;; global
-;;   (super-save-mode +1))
-#+end_src
-
-No backup files
-#+begin_src emacs-lisp
-(setq make-backup-files nil)  ;; Disable backup files like file~
-(setq auto-save-default nil)  ;; Disable auto-save files like #file#
-#+end_src
-
-Drag and drop images
-#+begin_src emacs-lisp
-(use-package org-download
-  :after org ;; lazily loads when org opens, not on startup, saves startup time
-  :custom
-  (org-download-method 'directory)
-  (org-download-image-dir "org-imgs")
-  (org-download-heading-lvl nil) ; this must be nil to stop folder creation
-  (org-download-timestamp-prefix-format nil) ; Optional: prevents timestamps in file names
-  (org-image-actual-width nil)
-  :config
-  (add-hook 'org-mode-hook 'org-download-enable) ;; enables in org mode
-  (add-hook 'dired-mode-hook 'org-download-enable) ;; enables in dired mode
-  
-  (setq org-download-annotate-function
-        (lambda (link)
-          "#+ATTR_ORG: :width 500\n")))
-#+end_src
-
-Cmd + K to insert link
-#+begin_src emacs-lisp
-(with-eval-after-load 'org
-  (define-key org-mode-map (kbd "M-k") #'org-insert-link))
-#+end_src
-
-Bold, Underline, Itallic -> will work for all markdown/text modes (not just org)
-#+begin_src emacs-lisp
-(use-package wrap-region
-  :config
-  ;; Enable wrap-region globally across all modes
-  (wrap-region-global-mode 1)
-  
-  ;; Define the global wrappers and their shortcut keys
-  ;; Syntax: (wrap-region-add-wrapper "left" "right" "trigger-key")
-  (wrap-region-add-wrapper "/" "/" "M-i")
-  (wrap-region-add-wrapper "_" "_" "M-u"))
-#+end_src
-
-* Treemacs
+* 6. File Exploring
+** Treemacs
 #+begin_src emacs-lisp
 (use-package treemacs
   :bind
   ("C-t" . treemacs)
-  :hook
-  (emacs-startup . treemacs)
   :config
-  ;; treemacs follows whichever buffer you're on
-  (treemacs-follow-mode t)
-  ;; treemacs follows and sets the correct project root
-  (treemacs-project-follow-mode t)
-  ;; make tree font 85% the size of main buffer font
-  (set-face-attribute 'treemacs-root-face nil :height 0.85)
-  (set-face-attribute 'treemacs-directory-face nil :height 0.85)
-  (set-face-attribute 'treemacs-file-face nil :height 0.85)
-  (set-face-attribute 'treemacs-tags-face nil :height 0.85)
-  ;; hide modeline in treemacs
-  (add-hook 'treemacs-mode-hook (lambda () (setq mode-line-format nil)))
-  ;; git mode (https://github.com/Alexander-Miller/treemacs#git-mode)
-  (treemacs-git-mode 'extended))
+  ;; ----- functionality settings -----
+  (treemacs-follow-mode t)          ;; follow buffer you're on
+  (treemacs-project-follow-mode t)  ;; set correct root
+
+  ;; ----- visual settings -----
+  (setq treemacs-indentation 2)     ;; indentation level
+  (setq treemacs-width 30)          ;; window width
+
+  ;; Clean up the buffer visually via hooks
+  (add-hook 'treemacs-mode-hook 
+            (lambda () 
+              (setq mode-line-format nil)   ;; hide modeline
+              (text-scale-decrease 0.5)     ;; decrease text size
+              ;; remove underline when hovering over entries with mouse
+              (face-remap-add-relative 'highlight :underline nil)
+
+              ;; when text goes beyond treemacs width, don't render $
+              ;; simply truncate text
+              (unless buffer-display-table
+                (setq buffer-display-table (make-display-table)))
+              (set-display-table-slot buffer-display-table 'truncation (make-glyph-code ?\s))
+            )
+   )
+)
 
 ;; to get the specific VS Code style icons:
-(use-package treemacs-all-the-icons  :config
+(use-package treemacs-all-the-icons
+  :config
   (treemacs-load-theme "all-the-icons"))
 #+end_src
 
-* File Exploring
+Auto open treemacs for coding projects
+#+begin_src emacs-lisp
+(defun my/auto-open-treemacs ()
+  "Automatically open Treemacs if the current file belongs to a project."
+  (when (and (not (treemacs-get-local-window)) ; Don't do anything if treemacs is already open
+             (require 'project nil t)          ; Ensure project.el is loaded
+             (project-current)                 ; Check if we are actually in a project
+             (not (minibufferp)))              ; Don't trigger when navigating the minibuffer
+    
+    ;; Save selected window prevents Treemacs from stealing your cursor focus
+    (save-selected-window
+      ;; This function opens treemacs and isolates it to ONLY the current project
+      ;; which fits the minimalist vibe perfectly.
+      (treemacs-display-current-project-exclusively))))
+
+;; Attach the function to the file-opening hook
+(add-hook 'find-file-hook #'my/auto-open-treemacs)
+#+end_src
+
 ** File-finding shortcuts
 #+begin_src emacs-lisp
 ;; when C-c C-f, start already by "~/gonz/" instead of "~/"
 (setq default-directory "~/gonz/")
 #+end_src
-
 
 ** Dired (built-in)
 #+begin_src emacs-lisp
@@ -1403,7 +1391,6 @@ Dired-preview (disabled, distracting)
 ;; )
 #+end_src
 
-
 ** Dirvish (deactivated, too bulky/heavy for use-case)
 Two command line tools must be installed:
 1. coreutils (=brew install coreutils=)
@@ -1440,13 +1427,5 @@ Modernizes Emacs' dired: column-based,  file previews
 ;;          ("E"   . wdired-change-to-wdired-mode))) ;; (Crucial) Bulk-edit file names
 #+end_src
 
-* Leetcode
-#+begin_src emacs-lisp
-(use-package leetcode
-  :defer t
-  :config
-  (setq leetcode-prefer-language "cpp")
-  (setq leetcode-save-solutions t)
-  (setq leetcode-directory "~/gonz/cs/notes/algorithms/leetcode"))
-#+end_src
+
 
