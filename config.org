@@ -44,17 +44,52 @@ Directly translates Emacs Lisp (Elisp) code into machine code
       ;; 2. Update Emacs's own command search path so it natively uses GNU utils over macOS defaults
       (add-to-list 'exec-path gnu-path))))
 #+end_src
+
+integration mac reminders
+#+begin_src emacs-lisp
+(define-derived-mode apple-reminders-mode org-mode "Reminders"
+  "A specialized Org mode that automatically fetches Apple Reminders."
+  (let* ((cli-path (or (executable-find "remindctl")
+                       "/opt/homebrew/bin/remindctl"))
+         (inhibit-read-only t))
+    
+    (unless (file-exists-p cli-path)
+      (error "The remindctl CLI was not found."))
+      
+    ;; Fetch and insert the reminders
+    (erase-buffer)
+    ;; file formatting
+    (insert "📅 Reminders Due Today\n")
+    
+    (let ((output (shell-command-to-string (concat cli-path " today"))))
+      (if (string-blank-p output)
+          (insert "No reminders due today! 🎉\n")
+        (insert output)))
+        
+    (goto-char (point-min))
+    
+    ;; Trick Emacs into thinking the file is unmodified so it doesn't ask to save
+    (set-buffer-modified-p nil))
+    
+  ;; Lock the file as read-only
+  (read-only-mode 1))
+
+;; Tell Emacs to strictly use this mode whenever a file named "reminders.org" is opened
+(add-to-list 'auto-mode-alist '("/reminders\\.org\\'" . apple-reminders-mode))
+#+end_src
+
+
 ** Startup Optimization (Garbage Collection)
 Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800KB). Because loading packages generates a lot of garbage, Emacs will pause hundreds of times during startup just to clean up memory.
 #+begin_src emacs-lisp
-;; Make startup faster by reducing the frequency of garbage collection
-(setq gc-cons-threshold (* 100 1024 1024)
-      read-process-output-max (* 1024 1024))
+  ;; Make startup faster by reducing the frequency of garbage collection
+  (setq gc-cons-threshold (* 100 1024 1024)
+        read-process-output-max (* 1024 1024))
 
-;; Reset GC to a reasonable normal value after startup
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (setq gc-cons-threshold (* 2 1024 1024))))
+  ;; Reset GC to a reasonable normal value after startup
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (setq gc-cons-threshold (* 2 1024 1024))))
 #+end_src
 ** Package Management
 #+begin_src emacs-lisp
@@ -99,13 +134,6 @@ Update packages every 60 days
   (auto-package-update-at-time "09:00"))
 #+end_src
 
-** Startup Screen
-#+begin_src emacs-lisp
-(setq inhibit-startup-screen t) ;; hide default emacs startup screen
-;; Open dired ~/gonz/ on startup
-(setq initial-buffer-choice "~/gonz/")
-#+end_src
-
 * 2. Appearance & UI
 ** Decluttering
 #+begin_src emacs-lisp
@@ -114,7 +142,8 @@ Update packages every 60 days
 (scroll-bar-mode -1) ;; no scroll bars
 (set-face-attribute 'fringe nil :background 'unspecified) ;; no fringes on the sides
 
-
+;; thin cursor
+(setq-default cursor-type '(bar . 2))
 
 ;; Spacing: Only apply to Org mode and plain text files
 (defun my/set-text-spacing ()
@@ -135,33 +164,15 @@ Update packages every 60 days
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 (global-visual-line-mode t) ;; lines wrap around
 #+end_src
-** Fonts & Typography
-Fonts
-#+begin_src emacs-lisp
-;; JetBrains Mono for code...
-(set-face-attribute 'default nil :font "JetBrains Mono" :height 160 :weight 'medium)
-;; Apple notes font for text
-(set-face-attribute 'variable-pitch nil :font "SF Pro Text" :height 180 :weight 'normal)
-;; Make bold be semi-bold, looks more modern
-(set-face-attribute 'bold nil :weight 'semi-bold)
-#+end_src
-
-Cursor
-#+begin_src emacs-lisp
-;; cursor width
-(setq-default cursor-type '(bar . 2))
-;; Apple Notes Yellow Cursor
-(set-cursor-color "#E5A822")
-#+end_src
 
 All the icons
 #+begin_src emacs-lisp
 (use-package all-the-icons
   :if (display-graphic-p))
 #+end_src
-
 ** Themes & Auto-Dark
 [[https://emacsfodder.github.io/emacs-theme-editor/][Online tool]] to automate creating your own theme
+
 *** Import themes
 Doom themes
 #+begin_src emacs-lisp
@@ -193,21 +204,28 @@ My custom themes
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
 #+end_src
 
-*** Auto Dark
-*Custom theme tweaks*
-Below are some tweaks to the themes being loaded, like removing fringes and changing the tab colors. These need to be reapplied when =auto-dark= switches themes.
+*** Settings to override theme
+Theme changes, for example =auto-dark=, override settings such as: font, cursor color, tab colors, etc
+The function below is added as a hook to =auto-dark= to ensure they're not overridden on theme switches
 
-This function which performs these tweaks runs on startup and =auto-dark='s theme switches
 #+begin_src emacs-lisp
-(defun my/apply-theme-tweaks ()  
-  ;; Remove Fringes globally
+(defun my/apply-theme-tweaks ()
+  ;; force fonts
+  (set-face-attribute 'default nil :font "JetBrains Mono" :height 160 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "SF Pro Text" :height 180 :weight 'normal)
+  (set-face-attribute 'bold nil :weight 'semi-bold)
+
+  ;; force org code blocks to use JetBrains Mono, so they render in minibuffer searches
+  (set-face-attribute 'org-block nil :font "JetBrains Mono" :inherit 'default)
+  
+  ;; remove fringes globally
   (set-face-attribute 'fringe nil :background 'unspecified)
 
   ;; Fetch the current theme's backgrounds dynamically
   (let ((bg-main (face-background 'default nil t))
         (bg-inactive (face-background 'mode-line-inactive nil t)))
 
-    ;; 1. Base Tab Bar
+    ;; Base Tab Bar
     (set-face-attribute 'tab-bar nil
                         :background bg-inactive
                         :foreground 'unspecified
@@ -215,7 +233,7 @@ This function which performs these tweaks runs on startup and =auto-dark='s them
                         :font "JetBrains Mono"
                         :height 150)
 
-    ;; 2. Active Tab (Uses main background + your custom accent)
+    ;; Active Tab (Uses main background + your custom accent)
     (set-face-attribute 'tab-bar-tab nil
                         :background bg-main
                         :foreground "#E5A822"
@@ -223,7 +241,7 @@ This function which performs these tweaks runs on startup and =auto-dark='s them
                         :overline "#E5A822"
                         :weight 'bold)
 
-    ;; 3. Inactive Tabs (Matches inactive background to blend in)
+    ;; Inactive Tabs (Matches inactive background to blend in)
     (set-face-attribute 'tab-bar-tab-inactive nil
                         :background bg-inactive
                         :foreground 'unspecified
@@ -233,8 +251,33 @@ This function which performs these tweaks runs on startup and =auto-dark='s them
 )
 #+end_src
 
+*** Auto Dark (loads the theme)
+*modus-operandi overrides*
+#+begin_src emacs-lisp
+(setq modus-operandi-palette-overrides
+      '(;; Make code block and subtle backgrounds a much lighter, softer gray
+        (bg-dim "#f8f8f8")          ; The default is usually a heavier #f0f0f0
+        (bg-alt "#f4f4f4")          ; A step between dim and the main white background
+        (bg-inactive "#fafafa")     ; Very light background for inactive windows
 
-Automatically changes from light to dark depending on Mac OS system
+        ;; Lighten the mode-line grays
+        (bg-mode-line-inactive "#f5f5f5")
+        (bg-mode-line-active "#e8e8e8")
+        
+        ;; soften the window divider gray
+        (border "#e0e0e0")
+        
+        ;; highlighted regions in yellow background
+        (bg-region "#FEF3C7")
+
+        ;; yellow cursor
+        (set-cursor-color "#E5A822")
+        )
+)
+#+end_src
+
+*Auto dark*
+- automatically changes from light to dark depending on Mac OS system
 #+begin_src emacs-lisp
 (use-package auto-dark
   :config
@@ -249,6 +292,7 @@ Automatically changes from light to dark depending on Mac OS system
 #+end_src
 
 ** Window Geometry & Margins
+Geometry
 #+begin_src emacs-lisp
 ;; Disable native macOS fullscreen virtual spaces transition
 (setq ns-use-native-fullscreen nil)
@@ -259,6 +303,49 @@ Automatically changes from light to dark depending on Mac OS system
 ;; Tell Emacs to maximize the window on startup
 (add-to-list 'default-frame-alist '(fullscreen . maximized))
 #+end_src
+
+My custom margins
+#+begin_src emacs-lisp
+;; Define how wide your code usually is (standard is 80 or 100)
+(defvar my-text-width 100
+  "The expected width of your text block for perfect visual centering.")
+
+(defun my/update-window-margins (&optional _frame)
+  "Dynamically center text by setting equal visual left and right margins."
+  (walk-windows
+   (lambda (win)
+     (let* ((width (window-total-width win))
+            ;; Subtract text width from window width, divide by 2 to center.
+            ;; If the window gets too small, fallback to a minimum 1 column margin.
+            (margin (max 1 (/ (- width my-text-width) 2))))
+       (set-window-margins win margin margin)))
+   nil 'visible))
+
+;; 3. Hook it so it runs automatically
+(add-hook 'window-configuration-change-hook #'my/update-window-margins)
+
+;; 4. Remove fringes 
+(fringe-mode 0)
+
+;; 5. Run once at startup
+(my/update-window-margins)
+#+end_src
+
+
+*Olivetti* (deactivated, too heavy/bulky package for margins, which is what i really want)
+#+begin_src emacs-lisp
+;; (use-package olivetti
+;;   :hook ((text-mode . olivetti-mode)
+;;          (prog-mode . olivetti-mode))
+;;   :custom
+;;   ;; A float forces a strict window percentage
+;;   (olivetti-body-width 0.85)
+;;   :config
+;;   ;; remove ugly fringes
+;;   (fringe-mode 0)
+;; )
+#+end_src
+
 ** Modeline
 Hiding modeline globally:
 #+begin_src emacs-lisp
@@ -443,54 +530,6 @@ Making image scrolling smooth (not needed with =emacs-plus=)
 ;; (add-to-list 'default-frame-alist '(alpha . (95 . 95)))
 ;; (add-to-list 'default-frame-alist '(alpha . (98 . 98)))
 #+end_src
-** Margins
-*My custom margins*
-#+begin_src emacs-lisp
-;; Margin percentages
-(defvar my-single-window-margin-pct 0.1 ;; 10%
-  "Left margin as a fraction of window width when only one window exists.")
-
-(defvar my-multi-window-margin-pct 0.05 ;; 5%
-  "Left margin as a fraction of window width when multiple windows exist.")
-
-;; function that adjusts margins dynamically
-(defun my/update-window-margins (&optional _frame)
-  "Set left margins as a percentage of each window's width."
-  (let ((is-single (one-window-p t)))
-    (walk-windows
-     (lambda (win)
-       (let* ((width (window-total-width win))
-              (pct (if is-single
-                       my-single-window-margin-pct
-                     my-multi-window-margin-pct))
-              (margin (round (* width pct))))
-         (set-window-margins win margin nil)))
-     nil 'visible)))
-
-;; 3. Hook it so it runs automatically when you split or close windows
-(add-hook 'window-configuration-change-hook #'my/update-window-margins)
-
-;; 4. Remove fringes as you preferred in your original config
-(fringe-mode 0)
-
-;; 5. Run it once at startup to apply the margins immediately
-(my/update-window-margins)
-#+end_src
-
-
-*Olivetti* (deactivated, too heavy/bulky package for margins, which is what i really want)
-#+begin_src emacs-lisp
-;; (use-package olivetti
-;;   :hook ((text-mode . olivetti-mode)
-;;          (prog-mode . olivetti-mode))
-;;   :custom
-;;   ;; A float forces a strict window percentage
-;;   (olivetti-body-width 0.85)
-;;   :config
-;;   ;; remove ugly fringes
-;;   (fringe-mode 0)
-;; )
-#+end_src
 ** Imenu
 #+begin_src emacs-lisp
 ;; (use-package imenu-list
@@ -613,21 +652,33 @@ Save undo's even after buffer closed
   (undo-fu-session-global-mode))
 #+end_src
 
-Autosaving setup
+*Autosaving setup*
+Built-in file autosaving setup (instead of saving into ~ file, saves file itself)
 #+begin_src emacs-lisp
-(use-package super-save
-  :config
-  (super-save-mode +1)
-  ;; save when away from emacs, changing buffers
-  (setq super-save-when-focus-lost t)
-  ;; save when idle
-  (setq super-save-auto-save-when-idle t)
-  ;; save if idle 0.5s
-  (setq super-save-idle-duration 0.5)
-  ;; save org src code blocks
-  (setq super-save-handle-org-src t)
-  ;; hide saving messages
-  (setq super-save-silent t))
+(setq auto-save-visited-interval 0.5) ;; save after 0.5s of idle time
+(auto-save-visited-mode 1)
+
+;; globally silence saving buffer message
+(setq save-silently t)
+#+end_src
+
+Super-save
+-  no longer in use because idle time is calculated as emacs user idle time (i.e. if you scroll or do any action file won't get saved)
+- =auto-save-visited-mode= calculates idle time as last time file was written to
+#+begin_src emacs-lisp
+;; (use-package super-save
+;;   :config
+;;   (super-save-mode +1)
+;;   ;; save when away from emacs, changing buffers
+;;   (setq super-save-when-focus-lost t)
+;;   ;; save when idle
+;;   (setq super-save-auto-save-when-idle t)
+;;   ;; save if idle 0.5s
+;;   (setq super-save-idle-duration 0.5)
+;;   ;; save org src code blocks
+;;   (setq super-save-handle-org-src t)
+;;   ;; hide saving messages
+;;   (setq super-save-silent t))
   #+end_src
 
 No backup files
@@ -679,18 +730,6 @@ Cmd + K to insert link
 )
 #+end_src
 
-Bold, Underline, Itallic -> will work for all markdown/text modes (not just org)
-#+begin_src emacs-lisp
-(use-package wrap-region
-  :config
-  ;; Enable wrap-region globally across all modes
-  (wrap-region-global-mode 1)
-  
-  ;; Define the global wrappers and their shortcut keys
-  ;; Syntax: (wrap-region-add-wrapper "left" "right" "trigger-key")
-  (wrap-region-add-wrapper "/" "/" "M-i")
-  (wrap-region-add-wrapper "_" "_" "M-u"))
-#+end_src
 
 ** Window Splitting & Movement
 Default emacs window split, on split, cursor stays in same buffer
@@ -739,10 +778,14 @@ Quick file finding
 ** Minibuffer & Search (Vertico/Consult/Orderless)
 Modern Command Palette (Replacing Ivy/Counsel)
 #+begin_src emacs-lisp
-;; [NEW] Vertico: Fast, minimalist vertical completions
+;; vertico is the front-end of consul
 (use-package vertico
   ;; defer loading vertico until after startup (reduces startup time)
   :hook (after-init . vertico-mode)
+  :bind (:map vertico-map
+              ;; these only apply when the Vertico search menu is active
+              ("C-s" . vertico-next)
+              ("C-r" . vertico-previous))
   :custom
   (vertico-cycle t) ;; Cycle through options at the bottom
   :config
@@ -750,20 +793,15 @@ Modern Command Palette (Replacing Ivy/Counsel)
   ;;           not one character only
   (require 'vertico-directory)
   (define-key vertico-map (kbd "DEL") #'vertico-directory-delete-char)
-
-  ;; UI: stop vertico from underlining C-x C-f, M-x
-  (set-face-attribute 'vertico-current nil :underline nil)
 )
 
-;; [NEW] consult provides asynchronous search, live previews, and enhanced navigation commands
+;; consult is the backend, provides asynchronous search, live previews, and enhanced navigation commands
 (use-package consult
   :bind
-  ;; C-c r to find recent files quickly
-  (("C-c r" . consult-recent-file)
-  ;; Replace default search with Consult's powerful ripgrep integration
-  ("C-s" . consult-line)) 
-  ;; Spotlight-like file search
-  (("C-x f" . my/spotlight-gonz))
+  ;; globally bind C-s to launch the Consult search line
+  ("C-s" . consult-line)
+  ;; spotlight-like file search
+  ("C-x f" . my/spotlight-gonz)
   :config
   (defun my/spotlight-gonz ()
     "Spotlight-like recursive search for files inside ~/gonz/"
@@ -777,9 +815,6 @@ Modern Command Palette (Replacing Ivy/Counsel)
   :init
   ;; Enhances your existing Vertico completion
   (setq completion-in-region-function #'consult-completion-in-region))
-
-;; no more searching backwards, rely on consult
-(keymap-unset global-map "C-r")
 
 ;; [NEW] Marginalia: Adds beautiful descriptions/docs next to Vertico commands
 (use-package marginalia
@@ -795,6 +830,27 @@ Modern Command Palette (Replacing Ivy/Counsel)
   (completion-category-overrides '((file (styles basic partial-completion)))))
 #+end_src
 ** Completion & Assistance (Corfu/Cape/Which-key)
+Prescient
+- combines with corfu autocomplete
+- improves suggestions by saving what you pick and better sorting suggested options
+#+begin_src emacs-lisp
+(use-package prescient
+  :config
+  (prescient-persist-mode 1)) ; save usage history across restarts
+
+;; can help vertico
+(use-package vertico-prescient
+  :after (vertico prescient)
+  :config
+  (vertico-prescient-mode 1))
+
+;; can help corfu
+(use-package corfu-prescient
+  :after (corfu prescient)
+  :config
+  (corfu-prescient-mode 1))
+#+end_src
+
 Corfu + Cape (new version of autocomplete)
 #+begin_src emacs-lisp
 (use-package corfu
@@ -842,40 +898,43 @@ Which-key (suggests commands)
         which-key-separator " → ")
   )
 #+end_src
-
+** Outline Indent
+#+begin_src emacs-lisp
+(use-package outline-indent
+  :commands outline-indent-minor-mode
+  :custom
+  (outline-indent-ellipsis " ▼"))
+#+end_src
 * 4. Session & Workspace
-** EasySession
+** EasySession + Startup Screen
 - Saves open files, tabs, windows when exiting emacs
 - Have different layouts saved as sessions, easily switch between them
 - [[https://github.com/jamescherti/easysession.el][Source]]
 
 #+begin_src emacs-lisp
+(setq inhibit-startup-screen t) ;; hide default emacs startup screen
+
+;; (use-package easysession
+;;   :demand t   ;; load immediately on startup
+;;   :hook (emacs-startup . (lambda ()
+;;                            (easysession-load "main")))
+;;   :config
+;;   ;; Don't modify macOS frame geometry on standard switches
+;;   ;; (setq easysession-frameset-restore-geometry nil) 
+;;   (easysession-setup))
+
 (use-package easysession
-  ;; ':demand t' ensures the package is loaded immediately upon startup
   :demand t
   :config
-  ;; Key mappings
-  (global-set-key (kbd "C-c sl") #'easysession-switch-to) ; Load session without geometry
-  (global-set-key (kbd "C-c ss") #'easysession-save)      ; Save session
-  (global-set-key (kbd "C-c sL") #'easysession-switch-to-and-restore-geometry) ; Force geometry restore
-  (global-set-key (kbd "C-c sr") #'easysession-rename)
-  (global-set-key (kbd "C-c sR") #'easysession-reset)
-  (global-set-key (kbd "C-c su") #'easysession-unload)
-  (global-set-key (kbd "C-c sd") #'easysession-delete)
-  
-  ;; Autosave sessions when changes are made
-  (easysession-save-mode 1)
-  ;; Save the current session when using `easysession-switch-to'
-  (setq easysession-switch-to-save-session t)
-  ;; Do not exclude the current session when switching sessions
-  (setq easysession-switch-to-exclude-current nil)
-  ;;Don't modify macOS frame geometry on standard switches
-  (setq easysession-frameset-restore-geometry nil)
-
-  ;; Don't automatically load a session on startup.
-  ;; We want to show our launcher screen first.
-  (setq easysession-setup-load-session nil)
-
+  ;; Prevent EasySession from automatically saving when switching sessions
+  (setq easysession-switch-to-save-session nil)
+  ;; Disable the background auto-save interval
+  (setq easysession-save-interval nil)  
+  ;; Kill all buffers, frames, and windows before loading a new session
+  (add-hook 'easysession-before-load-hook #'easysession-reset)
+  ;; Tell EasySession's auto-save feature that NO session qualifies for automatic saving
+  (setq easysession-save-mode-predicate (lambda () nil))
+  ;; Initialize hooks for startup
   (easysession-setup))
   #+end_src
 ** Dashboard (Idle)
@@ -917,180 +976,34 @@ Which-key (suggests commands)
 ;; )
 #+end_src
 
-** 
-* 5. Major Modes & Applications
-** Git (Magit)
-Magit
-#+begin_src emacs-lisp
-(use-package magit
-  :defer t
-  :bind (:map magit-mode-map
-              ("C-M-f" . magit-section-forward)
-              ("C-M-b" . magit-section-backward))
-  :hook
-  ((magit-pre-refresh  . diff-hl-magit-pre-refresh)
-   (magit-post-refresh . diff-hl-magit-post-refresh))
-  :config
-  (setq magit-mode-quit-window 'magit-restore-window-configuration
-		magit-auto-revert-mode t)
-  ; Remove tags from status buffer headings to speed up refresh slightly
-  (remove-hook 'magit-status-sections-hook 'magit-insert-tags-header))
-#+end_src
-
-Git Timemachine
-#+begin_src emacs-lisp
-(use-package git-timemachine
-  :defer t)
-#+end_src
-** Org Mode
-*** Visuals & Fonts
-*** Additional Packages (org-modern, toc-org)
-#+begin_src emacs-lisp
-(use-package org
-  :defer t
-  :hook
-  (org-mode . visual-line-mode) ;; line wrap
-  (org-mode . org-indent-mode)  ;; force indentation
-  :config
-  ;; Inline formatting
-  (setq org-hide-emphasis-markers t)
-  (setq org-startup-with-inline-images t)
-  
-  ;; short keystrokes for org block autocomplete
-  ;; e.g. <s -> source block
-  (require 'org-tempo) 
-
-  ;; Clean up source blocks
-  (setq org-edit-src-content-indentation 0)
-  
-  ;; #+title text 4x larger
-  (set-face-attribute 'org-document-title nil :height 2.0)
-  
-  ;; Load code block execution support
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   '((python . t)))
-
-  ;; Make org subscripts defined with: _{}
-  (setq org-use-sub-superscripts '{})
-)
-#+end_src
-
-Mixed-pitch
-#+begin_src emacs-lisp
-;; [NEW] Mixed-pitch: This ensures that while your regular text uses Sans-Serif,
-;; your Org-mode code blocks and tables stay cleanly aligned in Monospace!
-(use-package mixed-pitch
-  :hook (org-mode . mixed-pitch-mode)
-  :config
-  ;; tells mixed-pitch to respect your custom variable-pitch height!
-  (setq mixed-pitch-set-height t))
-#+end_src
-
-Org modern
-#+begin_src emacs-lisp
- (use-package org-modern
-  :hook (org-mode . org-modern-mode)
-  :config
-  ;; replace the heading stars
-  (setq org-modern-star 'replace)
-  ;; set the replacement character to a blank space
-  (setq org-modern-replace-stars " ")
-
-  ;; Hide folding arrows
-  (setq org-modern-fold-stars nil)
-  
-  ;; Clean Apple-style bullet points for standard lists (- or + or *)
-  (setq org-modern-list 
-        '((45 . "•") ; - becomes a solid dot
-          (43 . "-") ; + becomes a dash
-          )
-        )
-  )
-
-;; makes bulleted and numbered lists behave like modern editor (gdocs, pages)
-;; (renumbering, automatic new bullet when press enter, delete when press enter, ...)
-(use-package org-autolist
-  :hook (org-mode . org-autolist-mode))
-
-;; Toc-org: table of contents
-(use-package toc-org
-  :hook (org-mode . toc-org-enable))
-#+end_src
-
-Redering latex in org-mode
-#+begin_src emacs-lisp
-;; Better previews (SVG) if available
-(setq org-preview-latex-default-process 'dvisvgm)
-;; Adjust size
-(setq org-format-latex-options (plist-put org-format-latex-options :scale 1))
-;; Auto-preview LaTeX fragments when you open the file
-(setq org-startup-with-latex-preview t)
-#+end_src
-
-Org mode faces and fonts
-#+begin_src emacs-lisp
-;; make headings scale up like Apple Notes titles
-(custom-set-faces
- '(org-document-title ((t (:inherit variable-pitch :height 1.3 :weight bold))))
- '(org-level-1 ((t (:inherit variable-pitch :height 1.2 :weight bold))))
- '(org-level-2 ((t (:inherit variable-pitch :height 1.1 :weight semi-bold))))
- '(org-level-3 ((t (:inherit variable-pitch :height 1.0 :weight medium))))
- '(org-level-4 ((t (:inherit variable-pitch :height 1.0 :weight normal))))
- ;; ensures code blocks inside Org-mode don't have the line spacing applied to text org mode lines
- '(org-block ((t (:inherit fixed-pitch :line-spacing 0.0))))
-)
-#+end_src
-
-Open org files with all content unfolded
-#+begin_src emacs-lisp
-(setq org-startup-folded nil)
-#+end_src
-
-*** *Org Excalidraw*
-Somewhat complicated configuration, downloads required are detailed [[https://github.com/wdavew/org-excalidraw][here]]
-Using a slightly more [[https://github.com/4honor/org-excalidraw][modern version]] that improves the rendering
-#+begin_src emacs-lisp
-;; Set variables before requiring the package
-(setq org-excalidraw-directory "~/org-excalidraw-drawings")
-(require 'org-excalidraw)
-
-;; Explicitly wait until Org is fully awake before registering the links
-(with-eval-after-load 'org
-  (org-excalidraw-initialize))
-#+end_src
-
-Making opening images in org mode doable with a left click
-#+begin_src emacs-lisp
-;; Make Org inline images single-left-clickable
-(defun my-org-image-click-fix (&rest _args)
-  "Add a keymap to Org image overlays to allow opening with a single left click."
-  (let ((image-map (make-sparse-keymap)))
-    ;; Bind left-click to move the cursor to the mouse and open the link
-    (define-key image-map [mouse-1]
-      (lambda (event)
-        (interactive "e")
-        (mouse-set-point event)
-        (org-open-at-point)))
-    ;; Find all image overlays in the file and attach the custom click map
-    (dolist (ov (overlays-in (point-min) (point-max)))
-      (when (overlay-get ov 'org-image-overlay)
-        (overlay-put ov 'keymap image-map)))))
-
-;; Run this fix automatically every time Org mode draws images
-(advice-add 'org-display-inline-images :after #'my-org-image-click-fix)
-#+end_src
-
-** Markdown Mode
-#+begin_src emacs-lisp
-(use-package markdown-mode
-  :mode ("\\.md\\'" . markdown-mode))
-#+end_src
-** Programming
-*** Visuals
-Show line numbers
+* 5. Programming
+** Visuals
+Line numbers
 #+begin_src emacs-lisp
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
+
+;; add a space between line numbers and text
+(add-hook 'prog-mode-hook
+          (lambda ()
+            (let ((margin-spaces (propertize "  " 'face 'default)))
+              (setq-local line-prefix margin-spaces)
+              (setq-local wrap-prefix margin-spaces))))
+#+end_src
+
+Highlight if lines > 80 chars
+#+begin_src emacs-lisp
+;; highlight characters past column 80
+(use-package column-enforce-mode
+  :defer t
+  :init
+  (setq column-enforce-column 80) ;; 80 chars
+  :hook (prog-mode . column-enforce-mode)
+  :custom-face 
+  (column-enforce-face
+   ((t (:foreground "#ff6c6b"     ;; bright red
+        :background unspecified
+        :inherit default
+        :weight bold)))))
 #+end_src
 
 Show git changes
@@ -1110,7 +1023,13 @@ Vertical indentation guide bars
 (add-hook 'prog-mode-hook #'indent-bars-mode)
 #+end_src
 
-*** Editing
+Rainbow parentheses matching
+#+begin_src emacs-lisp
+(use-package rainbow-delimiters
+  :hook (prog-mode . rainbow-delimiters-mode))
+#+end_src
+
+** Editing
 #+begin_src emacs-lisp
 ;; highlight all occurrences of word selected / cursor at
 (use-package symbol-overlay
@@ -1161,7 +1080,7 @@ Indenting
                   c-basic-offset 2)))
 #+end_src
 
-*** Flycheck
+** Flycheck
 #+begin_src emacs-lisp
 (use-package flycheck
   :defer t
@@ -1235,7 +1154,269 @@ installed with =npm install -g pyright=
 
 Gopls (Golang): installed via homebrew
 
-*
+** Tree-sitter
+*Concept*
+- Historically, text editors relied RegEx to figure out how to highlight your code, indent it, or fold it
+- Tree-sitter is an incremental parsing library. Reads file and builds a Concrete Syntax Tree (CST) in real-time as you type
+- [[https://www.youtube.com/watch?v=Jes3bD6P0To][talk on tree-sitter]]
+
+*Benefits*
+- better highlighting
+- better indentation
+- better code folding
+
+*How to use*
+It's mostly invisible, it just highlights your text better
+
+Tree-sitter comes with emacs, but not the grammars used to parse each language
+Grammars were manually installed using =treesit-install-language-grammar= command
+#+begin_src emacs-lisp
+;; Tell Emacs to use Tree-sitter modes instead of legacy modes
+(setq major-mode-remap-alist
+      '(;; Core
+        (c-mode          . c-ts-mode)
+        (c++-mode        . c++-ts-mode)
+        (c-or-c++-mode   . c-or-c++-ts-mode)
+        (bash-mode       . bash-ts-mode)
+        (sh-mode         . bash-ts-mode)
+        (python-mode     . python-ts-mode)
+        (java-mode       . java-ts-mode)
+        (go-mode         . go-ts-mode)
+        
+        ;; Scripting & Web
+        (ruby-mode       . ruby-ts-mode)
+        (lua-mode        . lua-ts-mode)      
+        (css-mode        . css-ts-mode)
+        (html-mode       . html-ts-mode)
+        (javascript-mode . js-ts-mode)
+        (js-mode         . js-ts-mode)
+        (js2-mode        . js-ts-mode)       
+        (typescript-mode . typescript-ts-mode)
+        (php-mode        . php-ts-mode)      
+        
+        ;; Data & Backend
+        (json-mode       . json-ts-mode)
+        (js-json-mode    . json-ts-mode)
+        (yaml-mode       . yaml-ts-mode)
+        (conf-toml-mode  . toml-ts-mode)
+        (cmake-mode      . cmake-ts-mode)
+        (dockerfile-mode . dockerfile-ts-mode)
+        (csharp-mode     . csharp-ts-mode)
+        (rust-mode       . rust-ts-mode)
+        (elixir-mode     . elixir-ts-mode)   
+        (heex-mode       . heex-ts-mode)))   
+
+;; Catch extensions that have no built-in legacy mode to remap from
+(add-to-list 'auto-mode-alist '("\\.rs\\'" . rust-ts-mode))
+(add-to-list 'auto-mode-alist '("\\.ts\\'" . typescript-ts-mode))
+(add-to-list 'auto-mode-alist '("\\.tsx\\'" . tsx-ts-mode))
+(add-to-list 'auto-mode-alist '("\\.ya?ml\\'" . yaml-ts-mode))
+(add-to-list 'auto-mode-alist '("\\.toml\\'" . toml-ts-mode))
+(add-to-list 'auto-mode-alist '("\\.json\\'" . json-ts-mode))
+(add-to-list 'auto-mode-alist '("Dockerfile\\'" . dockerfile-ts-mode))
+(add-to-list 'auto-mode-alist '("\\.go\\'" . go-ts-mode))
+(add-to-list 'auto-mode-alist '("/go\\.mod\\'" . go-mod-ts-mode))
+#+end_src
+
+treesit-fold
+#+begin_src emacs-lisp
+(use-package treesit-fold
+  :vc (:url "https://github.com/emacs-tree-sitter/treesit-fold")
+  :bind (("<backtab>" . treesit-fold-toggle)
+         ;; ("C-c f c" . treesit-fold-close)
+         ;; ("C-c f o" . treesit-fold-open)
+         ;; ("C-c f r" . treesit-fold-open-recursively)
+         ;; ("C-c f C" . treesit-fold-close-all)
+         ;; ("C-c f O" . treesit-fold-open-all)
+         )
+  :config
+  (global-treesit-fold-mode 1))
+#+end_src
+
+* 6. Major Modes & Applications
+** Git (Magit)
+Magit
+#+begin_src emacs-lisp
+(use-package magit
+  :defer t
+  :bind (:map magit-mode-map
+              ("C-M-f" . magit-section-forward)
+              ("C-M-b" . magit-section-backward))
+  :hook
+  ((magit-pre-refresh  . diff-hl-magit-pre-refresh)
+   (magit-post-refresh . diff-hl-magit-post-refresh))
+  :config
+  (setq magit-mode-quit-window 'magit-restore-window-configuration
+		magit-auto-revert-mode t)
+  ; Remove tags from status buffer headings to speed up refresh slightly
+  (remove-hook 'magit-status-sections-hook 'magit-insert-tags-header))
+#+end_src
+
+Git Timemachine
+#+begin_src emacs-lisp
+(use-package git-timemachine
+  :defer t)
+#+end_src
+
+** Org Mode
+*** Main
+#+begin_src emacs-lisp
+(use-package org
+  :defer t
+  :hook
+  (org-mode . visual-line-mode) ;; line wrap
+  (org-mode . org-indent-mode)  ;; force indentation
+  :config
+  ;; Inline formatting
+  (setq org-hide-emphasis-markers t)
+  (setq org-startup-with-inline-images t)
+  
+  ;; short keystrokes for org block autocomplete
+  ;; e.g. <s -> source block
+  (require 'org-tempo) 
+
+  ;; Clean up source blocks
+  (setq org-edit-src-content-indentation 0)
+  
+  ;; Load code block execution support
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((python . t)))
+
+  ;; Make org subscripts defined with: _{}
+  (setq org-use-sub-superscripts '{})
+)
+#+end_src
+
+Mixed-pitch
+#+begin_src emacs-lisp
+;; [NEW] Mixed-pitch: This ensures that while your regular text uses Sans-Serif,
+;; your Org-mode code blocks and tables stay cleanly aligned in Monospace!
+(use-package mixed-pitch
+  :hook (org-mode . mixed-pitch-mode)
+  :config
+  ;; tells mixed-pitch to respect your custom variable-pitch height!
+  (setq mixed-pitch-set-height t))
+#+end_src
+
+Org modern
+#+begin_src emacs-lisp
+ (use-package org-modern
+  :hook (org-mode . org-modern-mode)
+  :config
+  ;; replace the heading stars
+  (setq org-modern-star 'replace)
+  ;; set the replacement character to a blank space
+  (setq org-modern-replace-stars " ")
+
+  ;; Hide folding arrows
+  (setq org-modern-fold-stars nil)
+  
+  ;; Clean Apple-style bullet points for standard lists (- or + or *)
+  (setq org-modern-list 
+        '((45 . "•") ; - becomes a solid dot
+          (43 . "-") ; + becomes a dash
+          )
+        )
+  )
+
+;; makes bulleted and numbered lists behave like modern editor (gdocs, pages)
+;; (renumbering, automatic new bullet when press enter, delete when press enter, ...)
+(use-package org-autolist
+  :hook (org-mode . org-autolist-mode))
+
+;; Toc-org: table of contents
+(use-package toc-org
+  :hook (org-mode . toc-org-enable))
+#+end_src
+
+Redering latex in org-mode
+#+begin_src emacs-lisp
+;; Better previews (SVG) if available
+(setq org-preview-latex-default-process 'dvisvgm)
+;; Adjust size
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 1))
+;; Auto-preview LaTeX fragments when you open the file
+(setq org-startup-with-latex-preview t)
+#+end_src
+
+Org mode faces and fonts
+#+begin_src emacs-lisp
+;; make headings scale up like Apple Notes titles
+(custom-set-faces
+ ;; title
+ '(org-document-title ((t (:inherit variable-pitch :height 2.0 :weight bold))))
+ ;; * 
+ '(org-level-1 ((t (:inherit variable-pitch :height 1.5 :weight bold))))
+ ;; **
+ '(org-level-2 ((t (:inherit variable-pitch :height 1.2 :weight bold))))
+ ;; ***
+ '(org-level-3 ((t (:inherit variable-pitch :height 1.15 :weight bold))))
+ '(org-level-4 ((t (:inherit variable-pitch :height 1.0 :weight normal))))
+ ;; ensures code blocks inside Org-mode don't have the line spacing applied to text org mode lines
+ '(org-block ((t (:inherit fixed-pitch :line-spacing 0.0))))
+)
+#+end_src
+
+Open org files with all content unfolded
+#+begin_src emacs-lisp
+(setq org-startup-folded nil)
+#+end_src
+
+Wrap selected text with *bold*, /itallic/, _underline_ 
+#+begin_src emacs-lisp
+(use-package wrap-region
+  :config
+  ;; Enable wrap-region globally across all modes
+  (wrap-region-global-mode 1)
+  
+  (wrap-region-add-wrappers
+  '(("*" "*" nil org-mode)   ; Bold text via *
+    ("/" "/" nil org-mode)   ; Italic text via /
+    ("_" "_" nil org-mode)   ; Underline via _  
+    ("=" "=" nil org-mode))) ; Verbatim via =
+)
+#+end_src
+
+*** *Org Excalidraw*
+Somewhat complicated configuration, downloads required are detailed [[https://github.com/wdavew/org-excalidraw][here]]
+Using a slightly more [[https://github.com/4honor/org-excalidraw][modern version]] that improves the rendering
+#+begin_src emacs-lisp
+;; Set variables before requiring the package
+(setq org-excalidraw-directory "~/org-excalidraw-drawings")
+(require 'org-excalidraw)
+
+;; Explicitly wait until Org is fully awake before registering the links
+(with-eval-after-load 'org
+  (org-excalidraw-initialize))
+#+end_src
+
+Making opening images in org mode doable with a left click
+#+begin_src emacs-lisp
+;; Make Org inline images single-left-clickable
+(defun my-org-image-click-fix (&rest _args)
+  "Add a keymap to Org image overlays to allow opening with a single left click."
+  (let ((image-map (make-sparse-keymap)))
+    ;; Bind left-click to move the cursor to the mouse and open the link
+    (define-key image-map [mouse-1]
+      (lambda (event)
+        (interactive "e")
+        (mouse-set-point event)
+        (org-open-at-point)))
+    ;; Find all image overlays in the file and attach the custom click map
+    (dolist (ov (overlays-in (point-min) (point-max)))
+      (when (overlay-get ov 'org-image-overlay)
+        (overlay-put ov 'keymap image-map)))))
+
+;; Run this fix automatically every time Org mode draws images
+(advice-add 'org-display-inline-images :after #'my-org-image-click-fix)
+#+end_src
+
+** Markdown Mode
+#+begin_src emacs-lisp
+(use-package markdown-mode
+  :mode ("\\.md\\'" . markdown-mode))
+#+end_src
 ** Latex
 Auctex
 #+begin_src emacs-lisp
@@ -1257,7 +1438,6 @@ Reftex
 	  reftex-toc-split-windows-fraction     0.2)
 #+end_src
 
-
 ** Leetcode
 #+begin_src emacs-lisp
 (use-package leetcode
@@ -1268,8 +1448,20 @@ Reftex
   (setq leetcode-directory "~/gonz/cs/notes/algorithms/leetcode"))
 #+end_src
 
+** Shell (vterm)
+vterm is using GNU utils, so GNU version of =ls=, =cp=, ...
+#+begin_src emacs-lisp
+(use-package vterm
+  :custom
+  (vterm-shell (executable-find "zsh"))
+  :config
+  ;; ensure shell is starting as an interactive login shell
+  (setq vterm-shell "/bin/zsh")
+  (setq vterm-max-scrollback 10000)
+)
+#+end_src
 
-* 6. File Exploring
+* 7. File Exploring
 ** Treemacs
 #+begin_src emacs-lisp
 (use-package treemacs
@@ -1291,7 +1483,7 @@ Reftex
               (text-scale-decrease 0.5)     ;; decrease text size
               ;; remove underline when hovering over entries with mouse
               (face-remap-add-relative 'highlight :underline nil)
-
+              
               ;; when text goes beyond treemacs width, don't render $
               ;; simply truncate text
               (unless buffer-display-table
@@ -1326,7 +1518,7 @@ Auto open treemacs for coding projects
 (add-hook 'find-file-hook #'my/auto-open-treemacs)
 #+end_src
 
-** File-finding shortcuts
+** Deafult Directory
 #+begin_src emacs-lisp
 ;; when C-c C-f, start already by "~/gonz/" instead of "~/"
 (setq default-directory "~/gonz/")
@@ -1336,9 +1528,12 @@ Auto open treemacs for coding projects
 #+begin_src emacs-lisp
 (use-package dired
   :ensure nil ;; built-in
+  :bind
+  ("C-t" . treemacs)
   :config
   ;; We use "-lgh" for clean, human-readable details (which are hidden by your hook anyway).
-  (setq dired-listing-switches "-lgh")
+  ;; show files starting with dot
+  (setq dired-listing-switches "-alh --group-directories-first")
   ;; make copying and deleting directories recursive by default, don't ask
   (setq dired-recursive-copies 'always)
   (setq dired-recursive-deletes 'always)
