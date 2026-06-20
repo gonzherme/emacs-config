@@ -78,7 +78,6 @@ integration mac reminders
 (add-to-list 'auto-mode-alist '("/reminders\\.org\\'" . apple-reminders-mode))
 #+end_src
 
-
 ** Startup Optimization (Garbage Collection)
 Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800KB). Because loading packages generates a lot of garbage, Emacs will pause hundreds of times during startup just to clean up memory.
 #+begin_src emacs-lisp
@@ -91,6 +90,7 @@ Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800
             (lambda ()
               (setq gc-cons-threshold (* 2 1024 1024))))
 #+end_src
+
 ** Package Management
 #+begin_src emacs-lisp
 ;; import package
@@ -623,6 +623,16 @@ Zooming in/out
 (global-set-key (kbd "M-=") 'text-scale-increase)
 (global-set-key (kbd "M--") 'text-scale-decrease)
 #+end_src
+
+Disable accidental horizontal scrolling with the mouse/trackpad
+#+begin_src emacs-lisp
+(global-set-key (kbd "<wheel-left>") 'ignore)
+(global-set-key (kbd "<wheel-right>") 'ignore)
+(global-set-key (kbd "<mouse-6>") 'ignore)
+(global-set-key (kbd "<mouse-7>") 'ignore)
+#+end_src
+
+
 ** Modernize Text Editing
 Copy/Paste/Undo/Redo
 #+begin_src emacs-lisp
@@ -689,21 +699,28 @@ No backup files
 
 Drag and drop images
 #+begin_src emacs-lisp
-(use-package org-download
-  :after org ;; lazily loads when org opens, not on startup, saves startup time
-  :custom
-  (org-download-method 'directory)
-  (org-download-image-dir "org-imgs")
-  (org-download-heading-lvl nil) ; this must be nil to stop folder creation
-  (org-download-timestamp-prefix-format nil) ; Optional: prevents timestamps in file names
-  (org-image-actual-width nil)
-  :config
-  (add-hook 'org-mode-hook 'org-download-enable) ;; enables in org mode
-  (add-hook 'dired-mode-hook 'org-download-enable) ;; enables in dired mode
+;; (use-package org-download
+;;   :after org ;; lazily loads when org opens, not on startup, saves startup time
+;;   :custom
+;;   (org-download-method 'directory)
+;;   (org-download-image-dir "org-imgs")
+;;   (org-download-heading-lvl nil) ; this must be nil to stop folder creation
+;;   (org-download-timestamp-prefix-format nil) ; Optional: prevents timestamps in file names
+;;   (org-image-actual-width nil)
+;;   :config
+;;   (add-hook 'dired-mode-hook 'org-download-enable) ;; enables in dired mode
+
+;;   ;; Fix collision with emacs-29 built-in drag and drop (lest customizable)
+;;   (add-hook 'org-mode-hook
+;;             (lambda ()
+;;               (org-download-enable) ;; Sets up any global/x-dnd hooks
+;;               ;; Force org-download's handlers to the front of the buffer-local DND list
+;;               (setq-local dnd-protocol-alist
+;;                           (append org-download-dnd-handlers dnd-protocol-alist))))
   
-  (setq org-download-annotate-function
-        (lambda (link)
-          "#+ATTR_ORG: :width 500\n")))
+;;   (setq org-download-annotate-function
+;;         (lambda (link)
+;;           "#+ATTR_ORG: :width 500\n")))
 #+end_src
 
 Cmd + K to insert link
@@ -730,7 +747,6 @@ Cmd + K to insert link
 )
 #+end_src
 
-
 ** Window Splitting & Movement
 Default emacs window split, on split, cursor stays in same buffer
 Added these functions so that cursor moves to new buffer
@@ -751,6 +767,7 @@ Added these functions so that cursor moves to new buffer
 (global-set-key (kbd "C-x 3") 'split-window-right-and-move)
 (global-set-key (kbd "C-x 2") 'split-window-below-and-move)
 #+end_src
+
 ** Custom Global Functions
 Quick file finding
 #+begin_src emacs-lisp
@@ -767,14 +784,8 @@ Quick file finding
   ;; (delete-other-windows)
   (dired "~/gonz/")
 )
-
-;; cs
-(defun cs ()
-  (interactive)
-  ;; (delete-other-windows)
-  (dired "~/gonz/cs")
-)
 #+end_src
+
 ** Minibuffer & Search (Vertico/Consult/Orderless)
 Modern Command Palette (Replacing Ivy/Counsel)
 #+begin_src emacs-lisp
@@ -829,6 +840,7 @@ Modern Command Palette (Replacing Ivy/Counsel)
   (completion-styles '(orderless basic))
   (completion-category-overrides '((file (styles basic partial-completion)))))
 #+end_src
+
 ** Completion & Assistance (Corfu/Cape/Which-key)
 Prescient
 - combines with corfu autocomplete
@@ -898,6 +910,7 @@ Which-key (suggests commands)
         which-key-separator " → ")
   )
 #+end_src
+
 ** Outline Indent
 #+begin_src emacs-lisp
 (use-package outline-indent
@@ -905,6 +918,7 @@ Which-key (suggests commands)
   :custom
   (outline-indent-ellipsis " ▼"))
 #+end_src
+
 * 4. Session & Workspace
 ** EasySession + Startup Screen
 - Saves open files, tabs, windows when exiting emacs
@@ -937,6 +951,7 @@ Which-key (suggests commands)
   ;; Initialize hooks for startup
   (easysession-setup))
   #+end_src
+
 ** Dashboard (Idle)
 #+begin_src emacs-lisp
 ;; (use-package dashboard
@@ -968,6 +983,7 @@ Which-key (suggests commands)
 ;;                                   "~/gonz/goals/finances.org"
 ;;                                   "~/gonz/goals/two-sigma.org")))
 #+end_src
+
 ** Screen Saver (Idle)
 #+begin_src emacs-lisp
 ;; (use-package zone
@@ -1345,9 +1361,9 @@ Org mode faces and fonts
 ;; make headings scale up like Apple Notes titles
 (custom-set-faces
  ;; title
- '(org-document-title ((t (:inherit variable-pitch :height 2.0 :weight bold))))
+ '(org-document-title ((t (:inherit variable-pitch :height 1.8 :weight bold))))
  ;; * 
- '(org-level-1 ((t (:inherit variable-pitch :height 1.5 :weight bold))))
+ '(org-level-1 ((t (:inherit variable-pitch :height 1.3 :weight bold))))
  ;; **
  '(org-level-2 ((t (:inherit variable-pitch :height 1.2 :weight bold))))
  ;; ***
@@ -1438,15 +1454,6 @@ Reftex
 	  reftex-toc-split-windows-fraction     0.2)
 #+end_src
 
-** Leetcode
-#+begin_src emacs-lisp
-(use-package leetcode
-  :defer t
-  :config
-  (setq leetcode-prefer-language "cpp")
-  (setq leetcode-save-solutions t)
-  (setq leetcode-directory "~/gonz/cs/notes/algorithms/leetcode"))
-#+end_src
 
 ** Shell (vterm)
 vterm is using GNU utils, so GNU version of =ls=, =cp=, ...
@@ -1454,10 +1461,15 @@ vterm is using GNU utils, so GNU version of =ls=, =cp=, ...
 (use-package vterm
   :custom
   (vterm-shell (executable-find "zsh"))
+  (vterm-max-scrollback 10000)
+  :bind (:map vterm-mode-map
+              ("M-v" . vterm-yank)
+              ("M-c" . kill-ring-save)
+              ("C-c C-c" . vterm-send-C-c)
+              )
   :config
   ;; ensure shell is starting as an interactive login shell
   (setq vterm-shell "/bin/zsh")
-  (setq vterm-max-scrollback 10000)
 )
 #+end_src
 
