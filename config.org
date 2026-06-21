@@ -1,6 +1,6 @@
 #+TITLE: emacs config
 
-* 1. Core System & Bootstrapping
+* 1. core system & bootstrapping
 ** Emacs Version
 Prefer =emacs-plus= over vanilla =emacs= and =emacs-mac=. The feature I care most about is scrolling, and =emacs-plus= is much better than the other emacs versions at that (on MacOS).
 
@@ -78,27 +78,16 @@ integration mac reminders
 (add-to-list 'auto-mode-alist '("/reminders\\.org\\'" . apple-reminders-mode))
 #+end_src
 
-** Startup Optimization (Garbage Collection)
-Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800KB). Because loading packages generates a lot of garbage, Emacs will pause hundreds of times during startup just to clean up memory.
-#+begin_src emacs-lisp
-  ;; Make startup faster by reducing the frequency of garbage collection
-  (setq gc-cons-threshold (* 100 1024 1024)
-        read-process-output-max (* 1024 1024))
-
-  ;; Reset GC to a reasonable normal value after startup
-  (add-hook 'emacs-startup-hook
-            (lambda ()
-              (setq gc-cons-threshold (* 2 1024 1024))))
-#+end_src
-
 ** Package Management
+- *Package manager*: the software that manages the installation and updating of packages. I am using the standard built-in emacs package manager =package=
+- *Archive*: online repositories where packages are stored. I'm using two archives: =elpa= (maintained by GNU developers) and =melpa= (open source, less strict, largest emacs archive)
+
 #+begin_src emacs-lisp
 ;; import package
 (require 'package)
 
 ;; set package repository sources
 (setq package-archives '(("melpa" . "https://melpa.org/packages/")
-                         ("org" . "https://orgmode.org/elpa/")
                          ("elpa" . "https://elpa.gnu.org/packages/")))
 
 ;; fire up the package system
@@ -134,35 +123,54 @@ Update packages every 60 days
   (auto-package-update-at-time "09:00"))
 #+end_src
 
-* 2. Appearance & UI
-** Decluttering
+* 2. early-init
+Have an =early-init.el= so no race conditions with emacs GUI renderer and can speedup startup with garbage collection.
+Added to =early-init.el=: =(menu-bar-mode -1)=, =(tool-bar-mode -1)=, =(scroll-bar-mode -1)=
+
+* 3. appearance & UI
 #+begin_src emacs-lisp
-(menu-bar-mode -1) ;; no menubar
-(tool-bar-mode -1) ;; no toolbars
-(scroll-bar-mode -1) ;; no scroll bars
-(set-face-attribute 'fringe nil :background 'unspecified) ;; no fringes on the sides
+;; Core visuals & Decluttering
+(fringe-mode 0)
+
+;; macOS Transparent Titlebar & Geometry
+(setq frame-title-format nil
+      ns-use-proxy-icon nil
+      ns-use-native-fullscreen nil
+      frame-resize-pixelwise t)
+(add-to-list 'default-frame-alist '(titlebar-value . nil))
+(add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
+(add-to-list 'default-frame-alist '(fullscreen . maximized))
+
+;; visual center: everywhere except mini-buffer
+(use-package visual-fill-column 
+  :custom
+  (visual-fill-column-width 100)
+  (visual-fill-column-center-text t)
+  :hook
+  (after-change-major-mode . my/enable-visual-fill-column))
+
+(defun my/enable-visual-fill-column ()
+  (unless (minibufferp)
+    (visual-fill-column-mode 1)))
+
+;; load entire file highlighting when opening
+(add-hook 'find-file-hook #'font-lock-ensure t)
 
 ;; thin cursor
 (setq-default cursor-type '(bar . 2))
 
-;; Spacing: Only apply to Org mode and plain text files
-(defun my/set-text-spacing ()
-  (setq-local line-spacing 0.2))
-(add-hook 'org-mode-hook #'my/set-text-spacing)
-(add-hook 'text-mode-hook #'my/set-text-spacing)
+;; lines wrap around
+(global-visual-line-mode t)
+#+end_src
 
-;; transparent title bar
-;; Hide the title bar string but keep the window control buttons
-(setq frame-title-format nil)
-
-;; Use a transparent titlebar to let it merge seamlessly with the Emacs background
-(add-to-list 'default-frame-alist '(titlebar-value . nil))
-(add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
-(setq ns-use-proxy-icon nil)
-
-;; display line nums in prog mode
-(add-hook 'prog-mode-hook #'display-line-numbers-mode)
-(global-visual-line-mode t) ;; lines wrap around
+Smooth scrollling (Emacs 29+)
+#+begin_src emacs-lisp
+(pixel-scroll-precision-mode 1)
+;; Disable accidental horizontal scrolling with the mouse/trackpad
+(global-set-key (kbd "<S-wheel-up>") 'ignore)
+(global-set-key (kbd "<S-wheel-down>") 'ignore)
+(global-set-key (kbd "<S-mouse-4>") 'ignore)
+(global-set-key (kbd "<S-mouse-5>") 'ignore)
 #+end_src
 
 All the icons
@@ -170,7 +178,9 @@ All the icons
 (use-package all-the-icons
   :if (display-graphic-p))
 #+end_src
-** Themes & Auto-Dark
+
+
+** Theme & Fonts
 [[https://emacsfodder.github.io/emacs-theme-editor/][Online tool]] to automate creating your own theme
 
 *** Import themes
@@ -184,7 +194,7 @@ Doom themes
 )
 #+end_src
 
-Github-emacs-theme
+Vscode theme
 #+begin_src emacs-lisp
 (use-package vscode-dark-plus-theme
   :config
@@ -204,55 +214,17 @@ My custom themes
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
 #+end_src
 
-*** Settings to override theme
-Theme changes, for example =auto-dark=, override settings such as: font, cursor color, tab colors, etc
-The function below is added as a hook to =auto-dark= to ensure they're not overridden on theme switches
-
+*** Set theme
+Font
 #+begin_src emacs-lisp
-(defun my/apply-theme-tweaks ()
-  ;; force fonts
-  (set-face-attribute 'default nil :font "JetBrains Mono" :height 160 :weight 'medium)
-  (set-face-attribute 'variable-pitch nil :font "SF Pro Text" :height 180 :weight 'normal)
-  (set-face-attribute 'bold nil :weight 'semi-bold)
-
-  ;; force org code blocks to use JetBrains Mono, so they render in minibuffer searches
-  (set-face-attribute 'org-block nil :font "JetBrains Mono" :inherit 'default)
-  
-  ;; remove fringes globally
-  (set-face-attribute 'fringe nil :background 'unspecified)
-
-  ;; Fetch the current theme's backgrounds dynamically
-  (let ((bg-main (face-background 'default nil t))
-        (bg-inactive (face-background 'mode-line-inactive nil t)))
-
-    ;; Base Tab Bar
-    (set-face-attribute 'tab-bar nil
-                        :background bg-inactive
-                        :foreground 'unspecified
-                        :box 'unspecified
-                        :font "JetBrains Mono"
-                        :height 150)
-
-    ;; Active Tab (Uses main background + your custom accent)
-    (set-face-attribute 'tab-bar-tab nil
-                        :background bg-main
-                        :foreground "#E5A822"
-                        :box 'unspecified
-                        :overline "#E5A822"
-                        :weight 'bold)
-
-    ;; Inactive Tabs (Matches inactive background to blend in)
-    (set-face-attribute 'tab-bar-tab-inactive nil
-                        :background bg-inactive
-                        :foreground 'unspecified
-                        :box 'unspecified
-                        :overline nil
-                        :weight 'normal))  
-)
+;; force fonts
+(set-face-attribute 'default nil :font "JetBrains Mono" :height 160 :weight 'medium)
+(set-face-attribute 'variable-pitch nil :font "SF Pro Text" :height 180 :weight 'normal)
+(set-face-attribute 'bold nil :weight 'semi-bold)
 #+end_src
 
-*** Auto Dark (loads the theme)
-*modus-operandi overrides*
+*Light theme tweaks*
+modus operandi overrides
 #+begin_src emacs-lisp
 (setq modus-operandi-palette-overrides
       '(;; Make code block and subtle backgrounds a much lighter, softer gray
@@ -276,75 +248,32 @@ The function below is added as a hook to =auto-dark= to ensure they're not overr
 )
 #+end_src
 
-*Auto dark*
-- automatically changes from light to dark depending on Mac OS system
+*Ask theme on startup*
 #+begin_src emacs-lisp
-(use-package auto-dark
-  :config
-  ;; set dark theme and light theme
-  (setq auto-dark-themes '((vscode-dark-plus) (modus-operandi)))
-  ;; Hook our custom UI tweaks to run every time the theme toggles
-  (add-hook 'auto-dark-dark-mode-hook #'my/apply-theme-tweaks)
-  (add-hook 'auto-dark-light-mode-hook #'my/apply-theme-tweaks)
-  ;; enable
-  (auto-dark-mode 1)
-)
+(defvar my-light-theme 'modus-operandi)
+(defvar my-dark-theme  'vscode-dark-plus)
+
+(defun my-select-theme ()
+  "Ask whether to load light or dark theme."
+  (interactive)
+  (mapc #'disable-theme custom-enabled-themes)
+  (load-theme
+   (if (y-or-n-p "Use dark theme? ")
+       my-dark-theme
+     my-light-theme)
+   t))
+
+(add-hook 'emacs-startup-hook #'my-select-theme)
 #+end_src
 
-** Window Geometry & Margins
-Geometry
+Transparency
 #+begin_src emacs-lisp
-;; Disable native macOS fullscreen virtual spaces transition
-(setq ns-use-native-fullscreen nil)
-
-;; Force pixel-precise resizing to eliminate gaps at screen boundaries
-(setq frame-resize-pixelwise t)
-
-;; Tell Emacs to maximize the window on startup
-(add-to-list 'default-frame-alist '(fullscreen . maximized))
+;; 0..100 (100 = opaque, 0 = fully transparent)
+;; (add-to-list 'default-frame-alist '(alpha . (90 . 90)))
+;; (add-to-list 'default-frame-alist '(alpha . (95 . 95)))
+;; (add-to-list 'default-frame-alist '(alpha . (98 . 98)))
 #+end_src
 
-My custom margins
-#+begin_src emacs-lisp
-;; Define how wide your code usually is (standard is 80 or 100)
-(defvar my-text-width 100
-  "The expected width of your text block for perfect visual centering.")
-
-(defun my/update-window-margins (&optional _frame)
-  "Dynamically center text by setting equal visual left and right margins."
-  (walk-windows
-   (lambda (win)
-     (let* ((width (window-total-width win))
-            ;; Subtract text width from window width, divide by 2 to center.
-            ;; If the window gets too small, fallback to a minimum 1 column margin.
-            (margin (max 1 (/ (- width my-text-width) 2))))
-       (set-window-margins win margin margin)))
-   nil 'visible))
-
-;; 3. Hook it so it runs automatically
-(add-hook 'window-configuration-change-hook #'my/update-window-margins)
-
-;; 4. Remove fringes 
-(fringe-mode 0)
-
-;; 5. Run once at startup
-(my/update-window-margins)
-#+end_src
-
-
-*Olivetti* (deactivated, too heavy/bulky package for margins, which is what i really want)
-#+begin_src emacs-lisp
-;; (use-package olivetti
-;;   :hook ((text-mode . olivetti-mode)
-;;          (prog-mode . olivetti-mode))
-;;   :custom
-;;   ;; A float forces a strict window percentage
-;;   (olivetti-body-width 0.85)
-;;   :config
-;;   ;; remove ugly fringes
-;;   (fringe-mode 0)
-;; )
-#+end_src
 
 ** Modeline
 Hiding modeline globally:
@@ -391,87 +320,7 @@ the =:init= and =:config= consist of code to add dot to unsaved tabs like VSCode
   :hook (after-init . vim-tab-bar-mode))
 #+end_src
 
-*Custom appearance*
-Built-in =tab-bar-mode= + custom tab commands
-#+begin_src emacs-lisp
-;; ;; 1. Enable built-in workspace tabs
-;; (tab-bar-mode 1)
-
-;; ;; 2. Core Visuals
-;; (setq tab-bar-show 1)                      
-;; (setq tab-bar-close-button-show nil)       
-;; (setq tab-bar-new-button-show nil)         
-
-;; ;; 3. Modern UI Styling (The "Browser" Illusion)
-;; (setq tab-bar-tab-name-format-function
-;;       (lambda (tab i)
-;;         (let ((current-p (eq (car tab) 'current-tab)))
-;;           (propertize
-;;            (concat "  " (alist-get 'name tab) "  ")
-;;            'face (if current-p 'tab-bar-tab 'tab-bar-tab-inactive)))))
-
-;; ;; 4. New Tab Behavior
-;; (defun my/tab-bar-new-untitled-buffer ()
-;;   "Generates a new untitled buffer instead of *scratch*."
-;;   (generate-new-buffer "untitled"))
-
-;; (setq tab-bar-new-tab-choice #'my/tab-bar-new-untitled-buffer)
-#+end_src
-
-
-*Centaur tabs* (deactivated)
-Not great, doesn't behave like standard modern tabs
-#+begin_src emacs-lisp
-;; (use-package centaur-tabs
-;;   :demand t
-;;   :config
-;;   ;; 1. Core Visuals
-;;   (setq centaur-tabs-style "bar"
-;;         centaur-tabs-height 32
-;;         centaur-tabs-set-icons t
-;;         centaur-tabs-show-navigation-buttons nil
-;;         centaur-tabs-set-modified-marker t
-;;         centaur-tabs-show-new-tab-button nil)
-        
-;;   (centaur-tabs-change-fonts "JetBrains Mono" 130)
-
-;;   ;; 2. WRAP AROUND TABS
-;;   (setq centaur-tabs-cycle-scope 'tabs)
-
-;;   ;; 3. ONE SINGLE MAIN TAB GROUP (With a separate group for background utilities)
-;;   (defun my/centaur-tabs-buffer-groups ()
-;;     (let ((name (buffer-name)))
-;;       (if (member name '("*Ilist*" "*scratch*" "*Messages*" "*Warnings*" "*Compile-Log*"))
-;;           (list "System")  ;; Banished to their own hidden group
-;;         (list "Main"))))   ;; Your actual workspace tabs
-;;   (setq centaur-tabs-buffer-groups-function #'my/centaur-tabs-buffer-groups)
-
-;;   ;; 4. THE CLEANED HIDE FUNCTION
-;;   ;; Only hide actual internal/minibuffer noise so the tab bar never breaks.
-;;   (defun my/centaur-tabs-hide-tab (buf)
-;;     (let ((name (buffer-name buf)))
-;;       (or (string-prefix-p " " name)
-;;           (string-prefix-p "*Minibuf-" name))))
-;;   (setq centaur-tabs-hide-tab-function #'my/centaur-tabs-hide-tab)
-
-;;   ;; Force the UI to refresh immediately
-;;   (when (fboundp 'centaur-tabs-display-update)
-;;     (centaur-tabs-display-update))
-
-;;   ;; 5. Sane Shortcuts
-;;   (defun my/new-empty-buffer ()
-;;     "Create a new untitled buffer."
-;;     (interactive)
-;;     (switch-to-buffer (generate-new-buffer "untitled")))
-
-;;   (global-set-key (kbd "M-t") #'my/new-empty-buffer)
-;;   (global-set-key (kbd "M-w") 'kill-current-buffer)
-;;   (global-set-key (kbd "<C-tab>")  'centaur-tabs-forward)
-;;   (global-set-key (kbd "<C-S-tab>") 'centaur-tabs-backward)
-
-;;   ;; Turn the package on
-;;   (centaur-tabs-mode t))
-#+end_src
+Tried =centaur-tabs= and =tab-bar-mode=, not great, they don't behave like standard modern tabs.
 
 ** Window Dividers
 Enable thin borders for both vertical and horizontal window splits
@@ -488,70 +337,28 @@ Enable thin borders for both vertical and horizontal window splits
 ;; Turn the mode on
 (window-divider-mode 1)
 #+end_src
-** Scrolling Setup
-Emacs-plus scrolling
-#+begin_src emacs-lisp
-(pixel-scroll-precision-mode 1)
-#+end_src
-
-Ensure highlighting of entire file is loaded on startup
-- avoids scrolling too quickly and reaching un-rendered regions of the file
-#+begin_src emacs-lisp
-(add-hook 'find-file-hook #'font-lock-ensure t)
-#+end_src
-
-Emacs-mac scrolling
-#+begin_src emacs-lisp
-  ;; Activate Yamamoto Mitsuharu's native smooth scrolling for Mac
-  ;; (mac-mouse-wheel-mode 1)
-#+end_src
-
-Making image scrolling smooth (not needed with =emacs-plus=)
-#+begin_src emacs-lisp
-;; Force Emacs to fetch the repository if you don't have it locally
-;; (unless (package-installed-p 'image-slicing)
-;;   (package-vc-install "https://github.com/ginqi7/image-slicing"))
-
-;; (use-package image-slicing
-;;   :config
-;;   ;; -- EWW Configuration --
-;;   ;; Cancels the default eww image render and uses image-slicing
-;;   (add-to-list 'shr-external-rendering-functions '(img . image-slicing-tag-img))
-;;   (push #'image-slicing-mode eww-after-render-hook)
-
-;;   ;; -- Elfeed Configuration (Optional) --
-;;   ;; Advice `elfeed-show-entry` to trigger `image-slicing-mode`
-;;   (advice-add #'elfeed-show-entry :after #'image-slicing-mode))
-#+end_src
-** Transparency
-#+begin_src emacs-lisp
-;; 0..100 (100 = opaque, 0 = fully transparent)
-;; (add-to-list 'default-frame-alist '(alpha . (90 . 90)))
-;; (add-to-list 'default-frame-alist '(alpha . (95 . 95)))
-;; (add-to-list 'default-frame-alist '(alpha . (98 . 98)))
-#+end_src
 ** Imenu
 #+begin_src emacs-lisp
-;; (use-package imenu-list
-;;   :bind (("M-i" . imenu-list-smart-toggle))
-;;   ;; Hides centaur tabs only inside the imenu-list buffer
-;;   :hook ((imenu-list-major-mode . centaur-tabs-local-mode)
-;;          (org-mode . imenu-list-minor-mode)
-;;          (prog-mode . imenu-list-minor-mode))
-;;   :config
-;;   (setq imenu-list-position 'left)
-;;   (setq imenu-list-size 30)
-;;   (setq imenu-list-focus-after-activation nil)
-;;   (setq imenu-list-auto-resize t)
-;;   ;; Dynamic Theme Matching (Inherit from your active theme's faces)
-;;   (set-face-attribute 'imenu-list-entry-face-0 nil :inherit 'font-lock-keyword-face :weight 'bold)
-;;   (set-face-attribute 'imenu-list-entry-face-1 nil :inherit 'font-lock-function-name-face :weight 'normal)
-;;   (set-face-attribute 'imenu-list-entry-face-2 nil :inherit 'font-lock-variable-name-face)
-;;   (set-face-attribute 'imenu-list-entry-face-3 nil :inherit 'font-lock-comment-face)
-;; )
+(use-package imenu-list
+  :bind (("M-i" . imenu-list-smart-toggle))
+  ;; Hides centaur tabs only inside the imenu-list buffer
+  :hook ((imenu-list-major-mode . centaur-tabs-local-mode)
+         (org-mode . imenu-list-minor-mode)
+         (prog-mode . imenu-list-minor-mode))
+  :config
+  (setq imenu-list-position 'left)
+  (setq imenu-list-size 30)
+  (setq imenu-list-focus-after-activation nil)
+  (setq imenu-list-auto-resize t)
+  ;; Dynamic Theme Matching (Inherit from your active theme's faces)
+  (set-face-attribute 'imenu-list-entry-face-0 nil :inherit 'font-lock-keyword-face :weight 'bold)
+  (set-face-attribute 'imenu-list-entry-face-1 nil :inherit 'font-lock-function-name-face :weight 'normal)
+  (set-face-attribute 'imenu-list-entry-face-2 nil :inherit 'font-lock-variable-name-face)
+  (set-face-attribute 'imenu-list-entry-face-3 nil :inherit 'font-lock-comment-face)
+)
 #+end_src
 
-* 3. Editor Mechanics
+* 4. editor mechanics
 ** Global Keybindings
 Apple-like
 #+begin_src emacs-lisp
@@ -622,14 +429,6 @@ Zooming in/out
 ;; 2. Bind Meta and plus/minus to change text size
 (global-set-key (kbd "M-=") 'text-scale-increase)
 (global-set-key (kbd "M--") 'text-scale-decrease)
-#+end_src
-
-Disable accidental horizontal scrolling with the mouse/trackpad
-#+begin_src emacs-lisp
-(global-set-key (kbd "<wheel-left>") 'ignore)
-(global-set-key (kbd "<wheel-right>") 'ignore)
-(global-set-key (kbd "<mouse-6>") 'ignore)
-(global-set-key (kbd "<mouse-7>") 'ignore)
 #+end_src
 
 
@@ -787,6 +586,19 @@ Quick file finding
 #+end_src
 
 ** Minibuffer & Search (Vertico/Consult/Orderless)
+In-buffer search
+#+begin_src emacs-lisp
+;; sticking with super fast isearch
+;; adding these to make it somewhat forgiving, not an exact match
+;; "foo bar" will match to:
+;; foo     bar
+;; foo\nbar
+;; foo--bar (depending on mode)
+(setq case-fold-search t) ;; case insensitive
+(setq search-whitespace-regexp ".*?") ;; lax whitespace matching
+#+end_src
+
+
 Modern Command Palette (Replacing Ivy/Counsel)
 #+begin_src emacs-lisp
 ;; vertico is the front-end of consul
@@ -810,7 +622,7 @@ Modern Command Palette (Replacing Ivy/Counsel)
 (use-package consult
   :bind
   ;; globally bind C-s to launch the Consult search line
-  ("C-s" . consult-line)
+  ;; ("C-s" . consult-line) ;; I like regular search more
   ;; spotlight-like file search
   ("C-x f" . my/spotlight-gonz)
   :config
@@ -856,38 +668,64 @@ Prescient
   :config
   (vertico-prescient-mode 1))
 
-;; can help corfu
-(use-package corfu-prescient
-  :after (corfu prescient)
-  :config
-  (corfu-prescient-mode 1))
+;; stopped using corfu code autocomplete
+;; (use-package corfu-prescient
+;;   :after (corfu prescient)
+;;   :config
+;;   (corfu-prescient-mode 1))
+#+end_src
+
+Smart codeium context-driven autocomplete (copilot payed)
+#+begin_src emacs-lisp
+;; 1. the backend suggesting completions
+(use-package codeium
+  ;; Install directly from their GitHub
+  :vc (:url "https://github.com/Exafunction/codeium.el"
+       :rev :newest
+       :branch "main")
+  :init
+  ;; Tell Emacs to use Codeium to generate suggestions
+  (add-to-list 'completion-at-point-functions #'codeium-completion-at-point))
+
+;; 2. the completion frontend package: render completions as dim ghost text (No menus!)
+(use-package completion-preview
+  :ensure nil ;; Built into Emacs 30
+  :hook (prog-mode . completion-preview-mode)
+  :bind (:map completion-preview-active-mode-map
+         ;; Press TAB or Right Arrow to accept the AI suggestion
+         ("TAB" . completion-preview-insert)
+         ("<tab>" . completion-preview-insert)
+         ("<right>" . completion-preview-insert)))
 #+end_src
 
 Corfu + Cape (new version of autocomplete)
 #+begin_src emacs-lisp
-(use-package corfu
-  :hook (prog-mode . corfu-mode)
-  :custom
-  (corfu-auto t)
-  (corfu-auto-delay 0.1)   ;; delay before showing suggestions
-  (corfu-auto-prefix 2)    ;; number of characters you have to type before showing suggestionsg
-  (corfu-quit-no-match t)  ;; remove autocomplete list if no matches found
+;; no longer using basic autocomplete, not very useful
+
+;; (use-package corfu
+;;   ;; :hook (prog-mode . corfu-mode)
+;;   :custom
+;;   (corfu-auto t)
+;;   (corfu-auto-delay 0.1)   ;; delay before showing suggestions
+;;   (corfu-auto-prefix 2)    ;; number of characters you have to type before showing suggestionsg
+;;   (corfu-quit-no-match t)  ;; remove autocomplete list if no matches found
   
-  ;; more secondary settings
-  (corfu-cycle t)                      ;; C-n on bottom suggestion cycles back to the top
-  (corfu-on-exact-match nil)           ;; Don't auto-insert exact matches aggressively
-  (corfu-quit-at-boundary 'separator)  ;; Handle space-separated fuzzy matching smoothly
-  (corfu-preselect 'valid)             ;; Smart highlight of the first valid candidate  
-)
+;;   ;; more secondary settings
+;;   (corfu-cycle t)                      ;; C-n on bottom suggestion cycles back to the top
+;;   (corfu-on-exact-match nil)           ;; Don't auto-insert exact matches aggressively
+;;   (corfu-quit-at-boundary 'separator)  ;; Handle space-separated fuzzy matching smoothly
+;;   (corfu-preselect 'valid)             ;; Smart highlight of the first valid candidate  
+;; )
 
 
-;; Cape provides extra completion backends (like file paths or history)
-(use-package cape
-  :init
-  ;; Add useful defaults to the completion-at-point-functions
-  (add-to-list 'completion-at-point-functions #'cape-file)
-  (add-to-list 'completion-at-point-functions #'cape-keyword))
+;; ;; Cape provides extra completion backends (like file paths or history)
+;; (use-package cape
+;;   :init
+;;   ;; Add useful defaults to the completion-at-point-functions
+;;   (add-to-list 'completion-at-point-functions #'cape-file)
+;;   (add-to-list 'completion-at-point-functions #'cape-keyword))
 #+end_src
+
 
 Which-key (suggests commands)
 #+begin_src emacs-lisp
@@ -912,31 +750,21 @@ Which-key (suggests commands)
 #+end_src
 
 ** Outline Indent
+not very useful in practice
 #+begin_src emacs-lisp
-(use-package outline-indent
-  :commands outline-indent-minor-mode
-  :custom
-  (outline-indent-ellipsis " ▼"))
+;; (use-package outline-indent
+;;   :commands outline-indent-minor-mode
+;;   :custom
+;;   (outline-indent-ellipsis " ▼"))
 #+end_src
 
-* 4. Session & Workspace
+* 5. session & workspace
 ** EasySession + Startup Screen
 - Saves open files, tabs, windows when exiting emacs
 - Have different layouts saved as sessions, easily switch between them
 - [[https://github.com/jamescherti/easysession.el][Source]]
 
 #+begin_src emacs-lisp
-(setq inhibit-startup-screen t) ;; hide default emacs startup screen
-
-;; (use-package easysession
-;;   :demand t   ;; load immediately on startup
-;;   :hook (emacs-startup . (lambda ()
-;;                            (easysession-load "main")))
-;;   :config
-;;   ;; Don't modify macOS frame geometry on standard switches
-;;   ;; (setq easysession-frameset-restore-geometry nil) 
-;;   (easysession-setup))
-
 (use-package easysession
   :demand t
   :config
@@ -992,11 +820,14 @@ Which-key (suggests commands)
 ;; )
 #+end_src
 
-* 5. Programming
+* 6. programming
 ** Visuals
 Line numbers
 #+begin_src emacs-lisp
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
+;; Minimalist styling: Remove the background highlights on line numbers
+(set-face-attribute 'line-number nil :background nil :foreground "#888888")
+(set-face-attribute 'line-number-current-line nil :background nil :weight 'bold)
 
 ;; add a space between line numbers and text
 (add-hook 'prog-mode-hook
@@ -1006,20 +837,30 @@ Line numbers
               (setq-local wrap-prefix margin-spaces))))
 #+end_src
 
-Highlight if lines > 80 chars
+Column enforce mode
 #+begin_src emacs-lisp
+;; disabled, visually distracting
 ;; highlight characters past column 80
-(use-package column-enforce-mode
-  :defer t
-  :init
-  (setq column-enforce-column 80) ;; 80 chars
-  :hook (prog-mode . column-enforce-mode)
-  :custom-face 
-  (column-enforce-face
-   ((t (:foreground "#ff6c6b"     ;; bright red
-        :background unspecified
-        :inherit default
-        :weight bold)))))
+;; (use-package column-enforce-mode
+;;   :defer t
+;;   :init
+;;   (setq column-enforce-column 80) ;; 80 chars
+;;   :hook (prog-mode . column-enforce-mode)
+;;   :custom-face 
+;;   (column-enforce-face
+;;    ((t (:foreground "#ff6c6b"     ;; bright red
+;;         :background unspecified
+;;         :inherit default
+;;         :weight bold)))))
+
+;; Clean, native line indicator at column 80
+(setq-default fill-column 80)
+(add-hook 'prog-mode-hook #'display-fill-column-indicator-mode)
+
+;; Style the indicator line to be an incredibly subtle gray line
+(set-face-attribute 'fill-column-indicator nil 
+                    :foreground "#e0e0e0" 
+                    :background 'unspecified)
 #+end_src
 
 Show git changes
@@ -1034,7 +875,9 @@ Vertical indentation guide bars
   :commands indent-bars-mode
   :custom
   (indent-bars-prefer-character t)
-  (indent-bars-display-on-blank-lines nil))
+  (indent-bars-width-frac 0.1)
+  (indent-bars-pad-frac 0.1)
+  (indent-bars-display-on-blank-lines t))
 
 (add-hook 'prog-mode-hook #'indent-bars-mode)
 #+end_src
@@ -1060,14 +903,14 @@ Rainbow parentheses matching
 #+end_src
 
 
-Code folding ([[https://github.com/jamescherti/outline-indent.el][source]])
+Code folding ([[https://github.com/jamescherti/outline-indent.el][source]]) (not very useful in practice)
 #+begin_src emacs-lisp
-(use-package outline-indent
-  :commands outline-indent-minor-mode
-  :custom
-  (outline-indent-ellipsis " ▼"))
+;; (use-package outline-indent
+;;   :commands outline-indent-minor-mode
+;;   :custom
+;;   (outline-indent-ellipsis " ▼"))
 
-(add-hook 'prog-mode-hook #'outline-indent-minor-mode)
+;; (add-hook 'prog-mode-hook #'outline-indent-minor-mode)
 #+end_src
 
 
@@ -1249,7 +1092,7 @@ treesit-fold
   (global-treesit-fold-mode 1))
 #+end_src
 
-* 6. Major Modes & Applications
+* 7. major modes & applications
 ** Git (Magit)
 Magit
 #+begin_src emacs-lisp
@@ -1433,6 +1276,7 @@ Making opening images in org mode doable with a left click
 (use-package markdown-mode
   :mode ("\\.md\\'" . markdown-mode))
 #+end_src
+
 ** Latex
 Auctex
 #+begin_src emacs-lisp
@@ -1473,75 +1317,17 @@ vterm is using GNU utils, so GNU version of =ls=, =cp=, ...
 )
 #+end_src
 
-* 7. File Exploring
-** Treemacs
-#+begin_src emacs-lisp
-(use-package treemacs
-  :bind
-  ("C-t" . treemacs)
-  :config
-  ;; ----- functionality settings -----
-  (treemacs-follow-mode t)          ;; follow buffer you're on
-  (treemacs-project-follow-mode t)  ;; set correct root
-
-  ;; ----- visual settings -----
-  (setq treemacs-indentation 2)     ;; indentation level
-  (setq treemacs-width 30)          ;; window width
-
-  ;; Clean up the buffer visually via hooks
-  (add-hook 'treemacs-mode-hook 
-            (lambda () 
-              (setq mode-line-format nil)   ;; hide modeline
-              (text-scale-decrease 0.5)     ;; decrease text size
-              ;; remove underline when hovering over entries with mouse
-              (face-remap-add-relative 'highlight :underline nil)
-              
-              ;; when text goes beyond treemacs width, don't render $
-              ;; simply truncate text
-              (unless buffer-display-table
-                (setq buffer-display-table (make-display-table)))
-              (set-display-table-slot buffer-display-table 'truncation (make-glyph-code ?\s))
-            )
-   )
-)
-
-;; to get the specific VS Code style icons:
-(use-package treemacs-all-the-icons
-  :config
-  (treemacs-load-theme "all-the-icons"))
-#+end_src
-
-Auto open treemacs for coding projects
-#+begin_src emacs-lisp
-(defun my/auto-open-treemacs ()
-  "Automatically open Treemacs if the current file belongs to a project."
-  (when (and (not (treemacs-get-local-window)) ; Don't do anything if treemacs is already open
-             (require 'project nil t)          ; Ensure project.el is loaded
-             (project-current)                 ; Check if we are actually in a project
-             (not (minibufferp)))              ; Don't trigger when navigating the minibuffer
-    
-    ;; Save selected window prevents Treemacs from stealing your cursor focus
-    (save-selected-window
-      ;; This function opens treemacs and isolates it to ONLY the current project
-      ;; which fits the minimalist vibe perfectly.
-      (treemacs-display-current-project-exclusively))))
-
-;; Attach the function to the file-opening hook
-(add-hook 'find-file-hook #'my/auto-open-treemacs)
-#+end_src
-
-** Deafult Directory
+* 8. dired
+default directory
 #+begin_src emacs-lisp
 ;; when C-c C-f, start already by "~/gonz/" instead of "~/"
 (setq default-directory "~/gonz/")
 #+end_src
 
-** Dired (built-in)
+dired config
 #+begin_src emacs-lisp
 (use-package dired
   :ensure nil ;; built-in
-  :bind
-  ("C-t" . treemacs)
   :config
   ;; We use "-lgh" for clean, human-readable details (which are hidden by your hook anyway).
   ;; show files starting with dot
@@ -1551,7 +1337,6 @@ Auto open treemacs for coding projects
   (setq dired-recursive-deletes 'always)
   ;; when switch from dired to dired, reuse buffer, don't create new one
   (setq dired-kill-when-opening-new-dired-buffer t)
-
   ;; Fix macOS ls compatibility issues if applicable
   (when (string-equal system-type "darwin")
     (require 'ls-lisp)
@@ -1571,15 +1356,6 @@ Auto open treemacs for coding projects
 *Dired-hacks*
 [[https://github.com/Fuco1/dired-hacks/tree/master][dired-hacks]] is a repo with a lot of features you can add to =dired=
 
-Dired-subtree (inline directory expansion)
-#+begin_src emacs-lisp
-(use-package dired-subtree
-  :after dired
-  :bind (:map dired-mode-map
-              ("TAB" . dired-subtree-toggle)
-              ("<tab>" . dired-subtree-toggle)
-              ("<backtab>" . dired-subtree-cycle)))
-#+end_src
 
 Dired-preview (disabled, distracting)
 #+begin_src emacs-lisp
@@ -1598,7 +1374,51 @@ Dired-preview (disabled, distracting)
 ;; )
 #+end_src
 
-** Dirvish (deactivated, too bulky/heavy for use-case)
+** dired-sidebar
+- much faster, less clunky than treemacs
+#+begin_src emacs-lisp
+;; icon setup
+(use-package vscode-icon
+  :commands (vscode-icon-for-file))
+
+;; dired-subtree (inline directory expansion)
+(use-package dired-subtree
+  :after dired
+  :bind (:map dired-mode-map
+              ("TAB" . dired-subtree-toggle)
+              ("<tab>" . dired-subtree-toggle)
+              ("<backtab>" . dired-subtree-cycle))
+  :config
+  ;; Customizes the indentation of nested folders for a cleaner, modern look
+  (setq dired-subtree-line-prefix "  "))
+
+;; sidebar setup
+(use-package dired-sidebar
+  :bind (("C-t" . dired-sidebar-toggle-sidebar))
+  :commands (dired-sidebar-toggle-sidebar)
+  :init
+  (add-hook 'dired-sidebar-mode-hook
+            (lambda ()
+              (unless (file-remote-p default-directory)
+                (auto-revert-mode 1))
+              ;; Hide file permissions, sizes, and owners for a minimal look
+              (dired-hide-details-mode 1)
+              ;; Remove the mode line inside the sidebar window for a seamless panel look
+              (setq-local mode-line-format nil)
+              ;; Optional: Disable line numbers if you use global-display-line-numbers-mode
+              (display-line-numbers-mode -1)))
+  :config
+  ;; Tell dired-sidebar to vscode icons
+  (setq dired-sidebar-theme 'vscode)
+  ;; Perfect sidebar width
+  (setq dired-sidebar-width 30)
+  ;; Automatically focus/reveal the current active file in the sidebar
+  (setq dired-sidebar-should-follow-file t))
+#+end_src
+
+
+** archived packages
+*** dirvish (too slow, clunky)
 Two command line tools must be installed:
 1. coreutils (=brew install coreutils=)
 2. fd (=brew install fd=)
@@ -1634,5 +1454,67 @@ Modernizes Emacs' dired: column-based,  file previews
 ;;          ("E"   . wdired-change-to-wdired-mode))) ;; (Crucial) Bulk-edit file names
 #+end_src
 
+*** treemacs (too slow, clunky)
+treemacs (disabled, very slow and clunky)
+#+begin_src emacs-lisp
+;; (use-package treemacs
+;;   :bind
+;;   ("C-t" . treemacs)
+;;   :config
+;;   ;; ----- functionality settings -----
+;;   (treemacs-follow-mode t)          ;; follow buffer you're on
+;;   (treemacs-project-follow-mode t)  ;; set correct root
 
+;;   ;; ----- visual settings -----
+;;   (setq treemacs-indentation 2)     ;; indentation level
+;;   (setq treemacs-width 30)          ;; window width
 
+;;   ;; Clean up the buffer visually via hooks
+;;   (add-hook 'treemacs-mode-hook 
+;;             (lambda () 
+;;               (setq mode-line-format nil)   ;; hide modeline
+;;               (text-scale-decrease 0.5)     ;; decrease text size
+;;               ;; remove underline when hovering over entries with mouse
+;;               (face-remap-add-relative 'highlight :underline nil)
+              
+;;               ;; when text goes beyond treemacs width, don't render $
+;;               ;; simply truncate text
+;;               (unless buffer-display-table
+;;                 (setq buffer-display-table (make-display-table)))
+;;               (set-display-table-slot buffer-display-table 'truncation (make-glyph-code ?\s))
+;;             )
+;;    )
+;; )
+
+;; ;; to get the specific VS Code style icons:
+;; (use-package treemacs-all-the-icons
+;;   :config
+;;   (treemacs-load-theme "all-the-icons"))
+#+end_src
+
+Auto open treemacs for coding projects (disabled)
+#+begin_src emacs-lisp
+;; (defun my/auto-open-treemacs ()
+;;   "Automatically open Treemacs if the current file belongs to a project."
+;;   (when (and (not (treemacs-get-local-window)) ; Don't do anything if treemacs is already open
+;;              (require 'project nil t)          ; Ensure project.el is loaded
+;;              (project-current)                 ; Check if we are actually in a project
+;;              (not (minibufferp)))              ; Don't trigger when navigating the minibuffer
+    
+;;     ;; Save selected window prevents Treemacs from stealing your cursor focus
+;;     (save-selected-window
+;;       ;; This function opens treemacs and isolates it to ONLY the current project
+;;       ;; which fits the minimalist vibe perfectly.
+;;       (treemacs-display-current-project-exclusively))))
+
+;; ;; Attach the function to the file-opening hook
+;; (add-hook 'find-file-hook #'my/auto-open-treemacs)
+#+end_src
+
+*  run last
+Emacs has a notoriously low default Garbage Collection (GC) threshold (about 800KB). Because loading packages generates a lot of garbage, Emacs will pause hundreds of times during startup just to clean up memory.
+
+Garbage collection frequency was reduced in =early-init.el= for faster startup, so need to reset now:
+#+begin_src emacs-lisp
+(setq gc-cons-threshold (* 16 1024 1024))
+#+end_src
