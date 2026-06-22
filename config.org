@@ -194,19 +194,7 @@ Doom themes
 )
 #+end_src
 
-Vscode theme
-#+begin_src emacs-lisp
-(use-package vscode-dark-plus-theme
-  :config
-  ;; Remove the border around the TODO word on org-mode files
-  (setq vscode-dark-plus-box-org-todo nil)
-  ;; Do not set different heights for some org faces
-  (setq vscode-dark-plus-scale-org-faces nil)
-  ;; Avoid inverting hl-todo face
-  (setq vscode-dark-plus-invert-hl-todo nil)
-  ;; Configure current line highlighting style (works best with Emacs 28 or newer)
-  (setq vscode-dark-plus-render-line-highlight 'line))
-#+end_src
+vscode-dark-plus theme had incompatibilities with lsp-mode
 
 
 My custom themes
@@ -223,8 +211,9 @@ Font
 (set-face-attribute 'bold nil :weight 'semi-bold)
 #+end_src
 
-*Light theme tweaks*
-modus operandi overrides
+
+*modus-operandi tweaks*
+overrides
 #+begin_src emacs-lisp
 (setq modus-operandi-palette-overrides
       '(;; Make code block and subtle backgrounds a much lighter, softer gray
@@ -239,29 +228,45 @@ modus operandi overrides
         ;; soften the window divider gray
         (border "#e0e0e0")
         
-        ;; highlighted regions in yellow background
+        ;; highlight in yellow
         (bg-region "#FEF3C7")
 
-        ;; yellow cursor
-        (set-cursor-color "#E5A822")
+        ;; Remove background from numbers in line-number-mode
+        (bg-line-number-inactive unspecified)
+        (bg-line-number-active unspecified)
         )
 )
 #+end_src
 
+settings to apply after loading theme
+#+begin_src emacs-lisp
+(defun my-custom-modus-changes-after-load ()
+  ;; 1. Make vertical line at 80 cols thin
+  (modus-themes-with-colors
+    (custom-set-faces
+     `(fill-column-indicator ((,c :background ,bg-main :foreground ,bg-inactive :height 1.5)))))
+)
+#+end_src
+
+
 *Ask theme on startup*
 #+begin_src emacs-lisp
 (defvar my-light-theme 'modus-operandi)
-(defvar my-dark-theme  'vscode-dark-plus)
+(defvar my-dark-theme  'ef-owl)
 
 (defun my-select-theme ()
   "Ask whether to load light or dark theme."
   (interactive)
   (mapc #'disable-theme custom-enabled-themes)
-  (load-theme
-   (if (y-or-n-p "Use dark theme? ")
-       my-dark-theme
-     my-light-theme)
-   t))
+  
+  (if (y-or-n-p "Use dark theme? ")
+      ;; If YES: Load the dark theme (No Modus changes needed here)
+      (load-theme my-dark-theme t)
+    
+    ;; If NO: Load the Modus light theme...
+    (load-theme my-light-theme t)
+    ;; ...and IMMEDIATELY force the color changes. Zero data race.
+    (my-custom-modus-changes-after-load)))
 
 (add-hook 'emacs-startup-hook #'my-select-theme)
 #+end_src
@@ -273,7 +278,6 @@ Transparency
 ;; (add-to-list 'default-frame-alist '(alpha . (95 . 95)))
 ;; (add-to-list 'default-frame-alist '(alpha . (98 . 98)))
 #+end_src
-
 
 ** Modeline
 Hiding modeline globally:
@@ -337,7 +341,6 @@ Enable thin borders for both vertical and horizontal window splits
 ;; Turn the mode on
 (window-divider-mode 1)
 #+end_src
-
 
 * 4. editor mechanics
 ** Global Keybindings
@@ -566,7 +569,7 @@ Quick file finding
 )
 #+end_src
 
-** Minibuffer & Search (Vertico/Consult/Orderless)
+** Minibuffer & Search Help (Vertico/Consult/Orderless)
 In-buffer search
 #+begin_src emacs-lisp
 ;; sticking with super fast isearch
@@ -634,9 +637,7 @@ Modern Command Palette (Replacing Ivy/Counsel)
   (completion-category-overrides '((file (styles basic partial-completion)))))
 #+end_src
 
-** Completion & Assistance (Corfu/Cape/Which-key)
 Prescient
-- combines with corfu autocomplete
 - improves suggestions by saving what you pick and better sorting suggested options
 #+begin_src emacs-lisp
 (use-package prescient
@@ -648,65 +649,7 @@ Prescient
   :after (vertico prescient)
   :config
   (vertico-prescient-mode 1))
-
-;; stopped using corfu code autocomplete
-;; (use-package corfu-prescient
-;;   :after (corfu prescient)
-;;   :config
-;;   (corfu-prescient-mode 1))
 #+end_src
-
-Smart codeium context-driven autocomplete (copilot payed)
-#+begin_src emacs-lisp
-;; 1. the backend suggesting completions
-(use-package codeium
-  ;; Install directly from their GitHub
-  :vc (:url "https://github.com/Exafunction/codeium.el"
-       :rev :newest
-       :branch "main")
-  :init
-  ;; Tell Emacs to use Codeium to generate suggestions
-  (add-to-list 'completion-at-point-functions #'codeium-completion-at-point))
-
-;; 2. the completion frontend package: render completions as dim ghost text (No menus!)
-(use-package completion-preview
-  :ensure nil ;; Built into Emacs 30
-  :hook (prog-mode . completion-preview-mode)
-  :bind (:map completion-preview-active-mode-map
-         ;; Press TAB or Right Arrow to accept the AI suggestion
-         ("TAB" . completion-preview-insert)
-         ("<tab>" . completion-preview-insert)
-         ("<right>" . completion-preview-insert)))
-#+end_src
-
-Corfu + Cape (new version of autocomplete)
-#+begin_src emacs-lisp
-;; no longer using basic autocomplete, not very useful
-
-;; (use-package corfu
-;;   ;; :hook (prog-mode . corfu-mode)
-;;   :custom
-;;   (corfu-auto t)
-;;   (corfu-auto-delay 0.1)   ;; delay before showing suggestions
-;;   (corfu-auto-prefix 2)    ;; number of characters you have to type before showing suggestionsg
-;;   (corfu-quit-no-match t)  ;; remove autocomplete list if no matches found
-  
-;;   ;; more secondary settings
-;;   (corfu-cycle t)                      ;; C-n on bottom suggestion cycles back to the top
-;;   (corfu-on-exact-match nil)           ;; Don't auto-insert exact matches aggressively
-;;   (corfu-quit-at-boundary 'separator)  ;; Handle space-separated fuzzy matching smoothly
-;;   (corfu-preselect 'valid)             ;; Smart highlight of the first valid candidate  
-;; )
-
-
-;; ;; Cape provides extra completion backends (like file paths or history)
-;; (use-package cape
-;;   :init
-;;   ;; Add useful defaults to the completion-at-point-functions
-;;   (add-to-list 'completion-at-point-functions #'cape-file)
-;;   (add-to-list 'completion-at-point-functions #'cape-keyword))
-#+end_src
-
 
 Which-key (suggests commands)
 #+begin_src emacs-lisp
@@ -802,7 +745,7 @@ not very useful in practice
 #+end_src
 
 * 6. programming
-** Visuals
+** visuals
 Line numbers
 #+begin_src emacs-lisp
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
@@ -818,30 +761,13 @@ Line numbers
               (setq-local wrap-prefix margin-spaces))))
 #+end_src
 
-Column enforce mode
+Vertical line at 80 chars
 #+begin_src emacs-lisp
-;; disabled, visually distracting
-;; highlight characters past column 80
-;; (use-package column-enforce-mode
-;;   :defer t
-;;   :init
-;;   (setq column-enforce-column 80) ;; 80 chars
-;;   :hook (prog-mode . column-enforce-mode)
-;;   :custom-face 
-;;   (column-enforce-face
-;;    ((t (:foreground "#ff6c6b"     ;; bright red
-;;         :background unspecified
-;;         :inherit default
-;;         :weight bold)))))
-
 ;; Clean, native line indicator at column 80
 (setq-default fill-column 80)
 (add-hook 'prog-mode-hook #'display-fill-column-indicator-mode)
-
-;; Style the indicator line to be an incredibly subtle gray line
-(set-face-attribute 'fill-column-indicator nil 
-                    :foreground "#e0e0e0" 
-                    :background 'unspecified)
+;; make it thin
+(setq-default display-fill-column-indicator-character ?│)
 #+end_src
 
 Show git changes
@@ -869,33 +795,15 @@ Rainbow parentheses matching
   :hook (prog-mode . rainbow-delimiters-mode))
 #+end_src
 
-** Editing
+Highlight all occurrences of word selected / cursor at
 #+begin_src emacs-lisp
-;; highlight all occurrences of word selected / cursor at
 (use-package symbol-overlay
   :hook (prog-mode . symbol-overlay-mode))
-
-;; automatic closing parenthesis
-(electric-pair-mode 1)
-;; disable <> pairing
-(setq electric-pair-inhibit-predicate
-      (lambda (c)
-        (if (char-equal c ?<) t (electric-pair-default-inhibit c))))
 #+end_src
 
 
-Code folding ([[https://github.com/jamescherti/outline-indent.el][source]]) (not very useful in practice)
-#+begin_src emacs-lisp
-;; (use-package outline-indent
-;;   :commands outline-indent-minor-mode
-;;   :custom
-;;   (outline-indent-ellipsis " ▼"))
 
-;; (add-hook 'prog-mode-hook #'outline-indent-minor-mode)
-#+end_src
-
-
-Language Support
+Language Modes
 #+begin_src emacs-lisp
 (add-to-list 'load-path "~/.emacs.d/language-support/") ;; ocaml, serpent-mode, why3
 (add-to-list 'auto-mode-alist '("\\.c0\\'" . c-mode)) ;; c0
@@ -910,17 +818,85 @@ Language Support
 ;; (add-to-list 'load-path "~/.emacs.d/language-support/serpent-mode.el")
 #+end_src
 
-Indenting
+** editing
+Automatic closing parenthesis
 #+begin_src emacs-lisp
-(setq-default indent-tabs-mode nil)  ;; always use spaces
-(setq-default tab-width 2)           ;; how wide to *show* any existing tabs
-(add-hook 'c-mode-common-hook
-          (lambda ()
-            (setq indent-tabs-mode nil  ; enforce spaces in C/C++
-                  c-basic-offset 2)))
+(electric-pair-mode 1)
+;; disable <> pairing
+(setq electric-pair-inhibit-predicate
+      (lambda (c)
+        (if (char-equal c ?<) t (electric-pair-default-inhibit c))))
 #+end_src
 
-** Flycheck
+
+Show at top of buffer function or class you're in
+#+begin_src emacs-lisp
+;; (use-package topsy
+;;   :hook (prog-mode . topsy-mode))
+#+end_src
+
+Code folding ([[https://github.com/jamescherti/outline-indent.el][source]]) (not very useful in practice)
+#+begin_src emacs-lisp
+;; (use-package outline-indent
+;;   :commands outline-indent-minor-mode
+;;   :custom
+;;   (outline-indent-ellipsis " ▼"))
+
+;; (add-hook 'prog-mode-hook #'outline-indent-minor-mode)
+#+end_src
+
+
+** code indenting
+#+begin_src emacs-lisp
+;; Always use spaces to indent, never tabs
+(setq-default indent-tabs-mode nil)
+;; render tabs with the length of 4 spaes
+(setq-default tab-width 4)
+#+end_src
+
+** context-driven autocomplete
+In =emacs=, autocomplete is split into front-end and back-end:
+
+*backend*: calculates the autocompletion options. examples:
+  - =codeium=: context-driven AI ()
+  - =supermaven=: context-driven AI
+  - =lsp-mode autocomplete=: very basic, variable names and definitions
+
+
+Currently using copilot and lsp-mode autocompletes together
+  #+begin_src emacs-lisp
+(use-package copilot
+  :vc (:url "https://github.com/copilot-emacs/copilot.el"
+       :rev :newest
+       :branch "main")
+  :hook (prog-mode . copilot-mode)
+  :bind (:map copilot-completion-map
+              ;; Accept full AI suggestion
+              ("<tab>" . copilot-accept-completion)
+              ("TAB" . copilot-accept-completion))
+  :config
+  ;; Prevent Copilot from messing with Emacs' native indentation
+  (add-to-list 'copilot-indentation-alist '(prog-mode 2))
+  (add-to-list 'copilot-indentation-alist '(java-mode 4)))
+  #+end_src
+  
+
+*frontend*: the UI that decides how to render the autocomplete options.  examples:
+  - =corfu=
+  - =completion-preview= (built-in emacs-30, shows as "ghost" text instead of obtrusive drop-down of options)
+    
+#+begin_src emacs-lisp
+(use-package completion-preview
+  :ensure nil ;; Built into Emacs 30
+  :hook (prog-mode . completion-preview-mode)
+  :bind (:map completion-preview-active-mode-map
+         ;; Press TAB or Right Arrow to accept the backend-autocomplete suggestion
+         ("TAB" . completion-preview-insert)
+         ("<tab>" . completion-preview-insert)
+         ("<right>" . completion-preview-insert)))
+#+end_src
+
+** flycheck
 #+begin_src emacs-lisp
 (use-package flycheck
   :defer t
@@ -930,8 +906,8 @@ Indenting
   (setq flycheck-check-syntax-automatically '(save mode-enable)))
 #+end_src
 
-** LSP
-*** LSP Concept
+** lsp
+*** lsp concept
 Language Server Protocol (LSP), introduced by Microsoft in 2016.Before, features like auto-complete, go-to-definition or syntax checking had to be written in plugins, different ones for different editors.
 
 Instead of writing a unique plugin for every editor-language combination, a language community only needs to write one LSP server
@@ -946,28 +922,47 @@ The text editor and LSP server processes are in constant communication. When you
 *Different Language Features*
 Different languages will have different LSP server implementations, so they will most likely have different features.
 
-*** Emacs LSP Mode
+*** lsp-mode
 [[https://emacs-lsp.github.io/lsp-mode/page/languages/][Documentation]] on each langauge LSP servers in emacs
 
-*lsp-mode*
+
+*LSP-mode is currently activated for: python, java, c, c++*
 #+begin_src emacs-lisp
-(defun efs/lsp-mode-setup ()
-  (setq lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols))
-  (lsp-headerline-breadcrumb-mode))
-
-
 (use-package lsp-mode
   :commands (lsp lsp-deferred) ;; both lsp and lsp-deffered will get activated
-  :hook (lsp-mode . efs/lsp-mode-setup)
+  :hook (
+         ;; modes to turn lsp on
+         (python-ts-mode . lsp-deferred)
+         (java-ts-mode . lsp-deferred)
+         (c-ts-mode . lsp-deferred)
+         (c++-ts-mode . lsp-deferred)
+         ;; custom lsp config function
+         (lsp-mode . my/lsp-mode-setup)
+         )
   :init
+  ;; disable lsp autocomplete (using copilot)
+  (setq lsp-completion-enable nil)
+  ;; list all lsp actions
   (setq lsp-keymap-prefix "C-c l") ;; lists all lsp actions
   :config
   (lsp-enable-which-key-integration t)
+  (global-set-key [M-mouse-1] #'lsp-find-definition)
+  (define-key lsp-mode-map (kbd "<M-mouse-1>") #'my-lsp-mouse-find-definition)
+  ;; auto guess root (don't ask)
+  (setq lsp-auto-guess-root t)
+)
 
-  ;; ------------- COME BACK TO THIS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  (global-set-key [M-mouse-1] #'lsp-ui-peek-find-definitions)
-  (global-set-key [M-mouse-1] #'my-lsp-find-definition-at-mouse)
-  (setq lsp-headerline-breadcrumb-enable 1))
+;; custom lsp mode function that sets up headerline
+(defun my/lsp-mode-setup ()  
+  (setq lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols))
+  (lsp-headerline-breadcrumb-mode))
+
+;; my custom jump to definition
+(defun my-lsp-mouse-find-definition (event)
+  "Move the cursor to the mouse click, then find the LSP definition."
+  (interactive "e")          ;; "e" tells Emacs this function takes a mouse event
+  (mouse-set-point event)    ;; Moves the actual cursor to your click location
+  (lsp-find-definition))     ;; Triggers the LSP jump
 #+end_src
 
 *lsp-ui*
@@ -976,25 +971,42 @@ Different languages will have different LSP server implementations, so they will
   :commands lsp-ui-mode
   :hook (lsp-mode . lsp-ui-mode)
   :config
+  ;; lsp documentation
   (setq lsp-ui-doc-enable t
         lsp-ui-doc-include-signature t
         lsp-ui-sideline-enable nil
         lsp-ui-doc-position 'at-point
         lsp-ui-doc-show-with-cursor nil
-        lsp-ui-doc-show-with-mouse t))
+        lsp-ui-doc-show-with-mouse t
+        ;; remove harsh border around the documentation
+        lsp-ui-doc-border nil
+        )
+)
 #+end_src
 
-*** LSP Servers
-*Python* (Pyright)
-installed with =npm install -g pyright=
-#+begin_src emacs-lisp
+*** lsp-servers
+- *python*
+  installed with =npm install -g pyright=
+  #+begin_src emacs-lisp
 (use-package lsp-pyright
   :hook (python-mode . (lambda () (require 'lsp-pyright))))
 #+end_src
 
-Gopls (Golang): installed via homebrew
+- *java*
+#+begin_src emacs-lisp
+;; java's language server can be downloaded with a melpa package
+(use-package lsp-java
+  :hook ((java-mode . lsp)
+         (java-ts-mode . lsp)) ;; Ensures it catches tree-sitter buffers too
+  :config
+  ;; Point this to your new Homebrew Java 21 binary
+  (setq lsp-java-java-path "/opt/homebrew/opt/openjdk@21/bin/java"))
+#+end_src
 
-** Tree-sitter
+
+- *Golang* =gopls= installed via homebrew
+
+** tree-sitter
 *Concept*
 - Historically, text editors relied RegEx to figure out how to highlight your code, indent it, or fold it
 - Tree-sitter is an incremental parsing library. Reads file and builds a Concrete Syntax Tree (CST) in real-time as you type
@@ -1058,20 +1070,48 @@ Grammars were manually installed using =treesit-install-language-grammar= comman
 (add-to-list 'auto-mode-alist '("/go\\.mod\\'" . go-mod-ts-mode))
 #+end_src
 
-treesit-fold
+
+** debugger
+*dap-mode*
+- Debug Adapter Protocol (DAP) revolutionized debugging (like lsp revolutionized autocomplete and highlighting)
+- Instead of having a different debugging interface for each language (=GDB= for C, =pdb= for Python, =JDWP= for Java), DAP is a standardized interface i.e. the front-end, which you can hook to different debuggers as backends
+- =dap-mode= is very often setup alongside =lsp-mode=, working together
+
 #+begin_src emacs-lisp
-(use-package treesit-fold
-  :vc (:url "https://github.com/emacs-tree-sitter/treesit-fold")
-  :bind (("<backtab>" . treesit-fold-toggle)
-         ;; ("C-c f c" . treesit-fold-close)
-         ;; ("C-c f o" . treesit-fold-open)
-         ;; ("C-c f r" . treesit-fold-open-recursively)
-         ;; ("C-c f C" . treesit-fold-close-all)
-         ;; ("C-c f O" . treesit-fold-open-all)
-         )
+(use-package dap-mode
+  :after lsp-mode
+  :commands dap-debug
+  :custom
+  ;; Enable the UI features you want
+  (dap-auto-configure-features '(sessions locals controls tooltip))
   :config
-  (global-treesit-fold-mode 1))
+  ;; Enable core dap functionality
+  (dap-mode 1)
+  (dap-ui-mode 1)
+  (dap-tooltip-mode 1)
+  (dap-ui-controls-mode 1) ;; Brings up the debugging button panel
+
+  ;; ----------------------------------------
+  ;; Language Specific Adapters
+  ;; ----------------------------------------
+  
+  ;; Java (Relies on lsp-java which handles the backend automatically)
+  (require 'dap-java)
+
+  ;; Python
+  (require 'dap-python)
+  (setq dap-python-debugger 'debugpy) ;; debugpy is the modern standard
+
+  ;; C and C++
+  (require 'dap-gdb-lldb)
+
+  ;; ----------------------------------------
+  ;; Keybindings
+  ;; ----------------------------------------
+  ;; dap-hydra provides a highly efficient overlay for stepping through code
+  (global-set-key (kbd "C-c d") 'dap-hydra))
 #+end_src
+
 
 * 7. major modes & applications
 ** Git (Magit)
