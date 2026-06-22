@@ -195,6 +195,9 @@ Doom themes
 #+end_src
 
 vscode-dark-plus theme had incompatibilities with lsp-mode
+#+begin_src emacs-lisp
+(use-package vscode-dark-plus-theme)
+#+end_src
 
 
 My custom themes
@@ -252,7 +255,7 @@ settings to apply after loading theme
 *Ask theme on startup*
 #+begin_src emacs-lisp
 (defvar my-light-theme 'modus-operandi)
-(defvar my-dark-theme  'ef-owl)
+(defvar my-dark-theme  'vscode-dark-plus)
 
 (defun my-select-theme ()
   "Ask whether to load light or dark theme."
