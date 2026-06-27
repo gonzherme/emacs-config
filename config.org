@@ -28,7 +28,10 @@ Directly translates Emacs Lisp (Elisp) code into machine code
 ;; NOTE: This will add a slight delay to startup as it has to spin up an interactive shell.
 (use-package exec-path-from-shell
   :config
-  (exec-path-from-shell-initialize))
+  (exec-path-from-shell-initialize)
+  ;; Force Emacs to copy these specific variables from your terminal
+  (setq exec-path-from-shell-variables '("PATH" "MANPATH" "LIBRARY_PATH" "PKG_CONFIG_PATH"))
+)
 
 
 ;; Tell Emacs where to look for Homebrew binaries and GNU utilities on macOS
@@ -178,7 +181,6 @@ All the icons
 (use-package all-the-icons
   :if (display-graphic-p))
 #+end_src
-
 
 ** Theme & Fonts
 [[https://emacsfodder.github.io/emacs-theme-editor/][Online tool]] to automate creating your own theme
@@ -418,15 +420,18 @@ Zooming in/out
 (global-set-key (kbd "M--") 'text-scale-decrease)
 #+end_src
 
-
 ** Modernize Text Editing
+
+#+begin_src emacs-lisp
+(setq use-short-answers t)               ;; change all "yes/no" prompts to "y/n"
+(setq large-file-warning-threshold nil)  ;; don't ask "large file, want to open?"
+(delete-selection-mode 1)                ;; typing on selected text deletes it
+(save-place-mode 1)                      ;; remember cursor location in files after closing
+(global-auto-revert-mode t)              ;; automatically show changes if the file has changed
+#+end_src
+
 Copy/Paste/Undo/Redo
 #+begin_src emacs-lisp
-(setq use-short-answers t)   ;; Change all "yes/no" prompts to "y/n"
-(delete-selection-mode 1)    ;; typing on selected text deletes it
-(save-place-mode 1)          ;; remember cursor location in files after closing
-(global-auto-revert-mode t)  ;; automatically show changes if the file has changed
-
 ;; undo and redo
 (use-package undo-fu
   :config
@@ -485,28 +490,28 @@ No backup files
 
 Drag and drop images
 #+begin_src emacs-lisp
-;; (use-package org-download
-;;   :after org ;; lazily loads when org opens, not on startup, saves startup time
-;;   :custom
-;;   (org-download-method 'directory)
-;;   (org-download-image-dir "org-imgs")
-;;   (org-download-heading-lvl nil) ; this must be nil to stop folder creation
-;;   (org-download-timestamp-prefix-format nil) ; Optional: prevents timestamps in file names
-;;   (org-image-actual-width nil)
-;;   :config
-;;   (add-hook 'dired-mode-hook 'org-download-enable) ;; enables in dired mode
+(use-package org-download
+  :after org ;; lazily loads when org opens, not on startup, saves startup time
+  :custom
+  (org-download-method 'directory)
+  (org-download-image-dir "org-imgs")
+  (org-download-heading-lvl nil) ; this must be nil to stop folder creation
+  (org-download-timestamp-prefix-format nil) ; Optional: prevents timestamps in file names
+  (org-image-actual-width nil)
+  :config
+  (add-hook 'dired-mode-hook 'org-download-enable) ;; enables in dired mode
 
-;;   ;; Fix collision with emacs-29 built-in drag and drop (lest customizable)
-;;   (add-hook 'org-mode-hook
-;;             (lambda ()
-;;               (org-download-enable) ;; Sets up any global/x-dnd hooks
-;;               ;; Force org-download's handlers to the front of the buffer-local DND list
-;;               (setq-local dnd-protocol-alist
-;;                           (append org-download-dnd-handlers dnd-protocol-alist))))
+  ;; Fix collision with emacs-29/30 built-in drag and drop.
+  ;; We override org-mode's native DND setup function to do nothing, 
+  ;; which allows org-download to freely govern drag-and-drop.
+  (advice-add 'org-setup-yank-dnd-handlers :override #'ignore)
   
-;;   (setq org-download-annotate-function
-;;         (lambda (link)
-;;           "#+ATTR_ORG: :width 500\n")))
+  ;; Simply enable org-download globally/locally without fighting the DND lists
+  (add-hook 'org-mode-hook 'org-download-enable)
+
+  (setq org-download-annotate-function
+        (lambda (link)
+          "#+ATTR_ORG: :width 500\n")))
 #+end_src
 
 Cmd + K to insert link
@@ -703,6 +708,13 @@ not very useful in practice
   (add-hook 'easysession-before-load-hook #'easysession-reset)
   ;; Tell EasySession's auto-save feature that NO session qualifies for automatic saving
   (setq easysession-save-mode-predicate (lambda () nil))
+
+;; Instruct frameset to strictly manage interior window splits, 
+  ;; never touching the macOS frame dimensions or window states.
+  (require 'frameset)
+  (dolist (param '(left top width height fullscreen))
+    (add-to-list 'frameset-filter-alist (cons param :never)))
+  
   ;; Initialize hooks for startup
   (easysession-setup))
   #+end_src
@@ -1115,7 +1127,6 @@ Grammars were manually installed using =treesit-install-language-grammar= comman
   (global-set-key (kbd "C-c d") 'dap-hydra))
 #+end_src
 
-
 * 7. major modes & applications
 ** Git (Magit)
 Magit
@@ -1322,7 +1333,6 @@ Reftex
 	  reftex-toc-split-windows-fraction     0.2)
 #+end_src
 
-
 ** Shell (vterm)
 vterm is using GNU utils, so GNU version of =ls=, =cp=, ...
 #+begin_src emacs-lisp
@@ -1340,6 +1350,43 @@ vterm is using GNU utils, so GNU version of =ls=, =cp=, ...
   (setq vterm-shell "/bin/zsh")
 )
 #+end_src
+
+** xwidgets pdf
+- open =pdf= files with Safari mac renderer
+
+#+begin_src emacs-lisp
+(defun my-xwidget-pdf-open ()
+  "Intercept PDF opening, kill raw buffer, and launch an Xwidget WebKit session instead."
+  (let ((file-path (buffer-file-name)))
+    (when file-path
+      ;; 1. Close the raw text buffer Emacs automatically created
+      (kill-buffer (current-buffer))
+      ;; 2. Convert the file path to an absolute URL and open it in Xwidgets
+      (xwidget-webkit-browse-url (concat "file://" (expand-file-name file-path))))))
+
+(defun my-xwidget-webkit-dark-mode-advice (xwidget event-type &rest _)
+  "Inject dark mode CSS deterministically when an xwidget loads a PDF."
+  ;; Only trigger when WebKit reports the load state has changed
+  (when (and (eq event-type 'load-changed)
+             (memq my-dark-theme custom-enabled-themes))
+    (let ((uri (xwidget-webkit-uri xwidget)))
+      ;; Verify that this specific xwidget is actually viewing a PDF
+      (when (and uri (string-match-p "\\.pdf\\'" uri))
+        (xwidget-webkit-execute-script
+         xwidget
+         "document.documentElement.style.filter = 'invert(1) hue-rotate(180deg)';
+          document.documentElement.style.background = '#1e1e1e';")))))
+
+;; Attach our listener to Emacs's primary xwidget event handler
+(advice-add 'xwidget-webkit-callback :after #'my-xwidget-webkit-dark-mode-advice)
+
+;; Tell Emacs to trigger our function every time a file ends in .pdf
+(add-to-list 'auto-mode-alist '("\\.pdf\\'" . my-xwidget-pdf-open))
+
+;; "=" instead of "+" to zoom
+(with-eval-after-load 'xwidget
+  (define-key xwidget-webkit-mode-map (kbd "=") 'xwidget-webkit-zoom-in))
+  #+end_src
 
 * 8. dired
 default directory
@@ -1359,8 +1406,8 @@ dired config
   ;; make copying and deleting directories recursive by default, don't ask
   (setq dired-recursive-copies 'always)
   (setq dired-recursive-deletes 'always)
-  ;; when switch from dired to dired, reuse buffer, don't create new one
-  (setq dired-kill-when-opening-new-dired-buffer t)
+  ;; (deactivated) when switch from dired to dired, reuse buffer, don't create new one
+  ;; (setq dired-kill-when-opening-new-dired-buffer t)
   ;; Fix macOS ls compatibility issues if applicable
   (when (string-equal system-type "darwin")
     (require 'ls-lisp)
